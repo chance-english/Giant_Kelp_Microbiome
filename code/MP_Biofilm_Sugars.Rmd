@@ -1,0 +1,507 @@
+---
+title: "Sugars"
+author: "Chance English"
+date: "10/3/2024"
+output: html_document
+---
+
+```{r setup, include=FALSE, message=FALSE, echo=FALSE, warning=FALSE}
+knitr::opts_chunk$set(message = FALSE, echo = FALSE, warning = FALSE)
+```
+
+
+```{r}
+
+library(tidyverse)
+library(dada2)
+library(ShortRead)
+library(beepr)
+library(phyloseq)
+library(ggplot2)
+library(dplyr)
+library(RColorBrewer)
+library(tidyverse)
+library(here)
+library(ggpubr)
+library(janitor)
+library(ggsci)
+library(lubridate)
+library(readxl)
+library(growthcurver)
+library(zoo)
+library(scales)
+library(kableExtra)
+library(broom)
+library(reshape2)
+library(vegan)
+library(indicspecies)
+library(readr)
+library(ggrepel)
+library(DESeq2)
+library(factoextra)
+
+library(cowplot)
+
+```
+
+
+
+# Sugar Monomers Composition & PCA
+
+
+```{r}
+
+
+sugars <- read_csv(here("Outputdata", "MP_DOM_sugar.csv"))
+
+
+
+sugars_subset <- sugars %>% 
+  select(DNA_SampleID, Fucose:`Man-URA`) %>% 
+  column_to_rownames(var = "DNA_SampleID")
+
+
+
+
+suga_numeric <- sugars[1:42,7:15]
+
+MP_DOM_Sugar_mature <- MP_DOM_Sugar %>% 
+  filter(age_d < 20) 
+
+
+suga_mature_numeric <- MP_DOM_Sugar[1:12, 6:13]
+
+```
+
+
+```{r}
+
+
+
+sug.pca1 <- prcomp(suga_numeric, scale = TRUE)
+
+fviz_eig(sug.pca1)
+
+sug.pca1
+
+summary(sug.pca1)
+
+get_eig(sug.pca1)
+
+eigenvals(sug.pca1)
+
+print(sug.pca1)
+
+# Mature Kelp
+
+sug.pca_mature <- prcomp(suga_mature_numeric, scale = TRUE)
+
+fviz_eig(sug.pca_mature)
+
+sug.pca_mature
+
+summary(sug.pca_mature)
+
+get_eig(sug.pca_mature)
+
+eigenvals(sug.pca_mature)
+
+```
+
+
+# Sugars Biplot for Mature vs. Senescent Kelp Exudates
+
+
+```{r}
+
+fviz_pca_biplot(sug.pca1,
+             col.var = "cos2", # Color by the quality of representation
+             gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),
+             col.ind = "black",
+             repel = TRUE     # Avoid text overlapping
+             )
+
+
+pca_plot <- fviz_pca_biplot(sug.pca1, 
+                level = "var",
+                habillage = sugars[1:42,]$phase, 
+                addEllipses = TRUE, 
+                ellipse.level = 0.95,
+                label = "var", labelsize = 5,
+                col.var = "black",
+                repel = T,
+                geom="point", pointsize = 4,
+                palette = c("#266A25","#BD9C3D")) +
+  labs(title = "", 
+       x = "PC1 (24%)",
+       y = "PC2 (24%)") +
+  scale_y_continuous(labels = label_number(accuracy = 1)) + 
+  theme(panel.background = element_rect(fill = "white", 
+                                        color = "black", 
+                                        size = 1.5),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        plot.margin = margin(1,1,1,1, "cm"),
+        strip.background = element_rect(fill = "white", 
+                                        color = "black"),
+        legend.key = element_rect(fill = "white"),
+        legend.text = element_text(size = 15),
+        legend.title = element_blank(),
+        legend.position = c(0.2,0.2),
+        axis.text = element_text(size = 30, 
+                                 color = "black"),
+        axis.title = element_text(size = 30),
+        text = element_text(family = "Times"))
+# PCA Plot Season 
+
+pca_plot_season <- fviz_pca_biplot(sug.pca1, 
+                level = "var",
+                habillage = MP_DOM_Sugar[1:42,]$season, 
+                addEllipses = TRUE, 
+                ellipse.level = 0.95,
+                label = "var", labelsize = 5,
+                col.var = "black",
+                repel = T,
+                geom="point", pointsize = 4,
+                palette = c("#022E73", "#9D3709")) +
+  labs(title = "", 
+       x = "PC1 (26%)",
+       y = "PC2 (23%)") +
+  scale_y_continuous(labels = label_number(accuracy = 1)) + 
+   theme(panel.background = element_rect(fill = "white", color = "black", size = 1.5),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        plot.margin = margin(1,1,1,1, "cm"),
+        strip.background = element_rect(fill = "white", color = "black"),
+        legend.key = element_rect(fill = "white"),
+        legend.text = element_text(size = 20),
+        legend.position = c(0.2,0.1),
+        legend.title = element_blank(),
+        axis.text = element_text(size = 30, color = "black"),
+        axis.title = element_text(size = 30),
+        text = element_text(family = "Times"))
+  
+# Compare Mature Kelp for Summer and Spring
+
+fviz_pca_biplot(sug.pca_mature,
+             col.var = "cos2", # Color by the quality of representation
+             gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),
+             col.ind = "black",
+             repel = TRUE     # Avoid text overlapping
+             )
+
+
+pca_plot_mature <- fviz_pca_biplot(sug.pca_mature, 
+                level = "var",
+                habillage = MP_DOM_Sugar_mature[1:12,]$season, 
+                addEllipses = TRUE, 
+                ellipse.level = 0.95,
+                label = "var", labelsize = 5,
+                col.var = "black",
+                repel = T,
+                geom="point", pointsize = 4,
+                palette = c("steelblue1", "firebrick1")) +
+  labs(title = "", 
+       x = "PC1 (26%)",
+       y = "PC2 (23%)") +
+  scale_y_continuous(labels = label_number(accuracy = 1)) + 
+   theme(panel.background = element_rect(fill = "white", color = "black", size = 1.5),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        plot.margin = margin(1,1,1,1, "cm"),
+        strip.background = element_rect(fill = "white", color = "black"),
+        legend.key = element_rect(fill = "white"),
+        legend.text = element_text(size = 20),
+        legend.position = c(0.15,0.10),
+        legend.title = element_blank(),
+        axis.text = element_text(size = 30, color = "black"),
+        axis.title = element_text(size = 30),
+        text = element_text(family = "Times"))
+  
+
+
+
+
+
+```
+
+
+# Permanova for Sugar Mol% between Mature and Senescent phase Kelp
+
+
+```{r}
+
+MP_DOM_sugar_c <- scale(sugars[1:42,7:15])
+
+# PERMANOVA of differences in carbohydrate composition by physiological state
+
+MP_DOM_sugar_physstate_adonis <- adonis(MP_DOM_sugar_c~phase, data = sugars[1:42,], method = "eu")
+
+MP_DOM_sugar_physstate_adonis # R2 = 0.14 p = 0.001
+
+
+# PERMANOVA of differences in carbohydrate composition by season 
+
+MP_DOM_sugar_season_adonis <- adonis(MP_DOM_sugar_c~season, data = sugars[1:42,], method = "eu")
+
+MP_DOM_sugar_season_adonis # R2 = 0.07 p = 0.007 **
+
+MP_DOM_sugar_phys_state_season_adonis <- adonis(MP_DOM_sugar_c~ phase + season, data = MP_DOM_Sugar[1:42,], method = "eu")
+
+MP_DOM_sugar_phys_state_season_adonis
+
+pairwiseAdonis::pairwise.adonis2(MP_DOM_sugar_phys_state_season_adonis)
+
+```
+
+
+# Fucose & Mannuronic Acid Boxplot over Time: SUMMER
+
+
+```{r}
+
+fucose_manURA_age <- MP_DOM_Sugar %>% 
+  filter(season == "Summer") %>% 
+  select(age_d, Fucose, `Man-URA`, blade) %>% 
+  pivot_longer(cols = Fucose: `Man-URA`,
+               names_prefix = "sugar",
+               values_to = "mol_percent") %>% 
+  mutate(age_d = as.factor(age_d))
+  
+boxplot_fucose_manURA_summer <- fucose_manURA_age %>% 
+  ggplot(aes(x = age_d, y = mol_percent*100, fill = name)) +
+  geom_boxplot() +
+   ggtitle(label = "Summer") + 
+  labs(x = "Age (d)",
+       y = "Mol%",
+       fill = "") +
+  scale_fill_manual(values = c("steelblue1", "firebrick1")) +
+  geom_point( position=position_dodge(width=0.75)) +
+   theme(panel.background = element_rect(fill = "white", color = "black", size = 1.5),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        plot.margin = margin(1,1,1,1, "cm"),
+        plot.title = element_text(size = 24),
+        strip.background = element_rect(fill = "white", color = "black"),
+        legend.key = element_rect(fill = "white"),
+        legend.text = element_text(size = 24),
+        legend.key.height = unit(0.5, "inch"),
+        legend.key.width = unit(0.4, "inch"),
+        legend.position = "none",
+        legend.title = element_text(size = 20),
+        axis.text = element_text(size = 30, color = "black"),
+        axis.title = element_text(size = 30),
+        text = element_text(family = "Times"))
+
+
+
+
+```
+
+
+# Fucose & Mannuronic Acid Boxplot over Time: SPRING
+
+
+```{r}
+
+fucose_manURA_age_spring <- MP_DOM_Sugar %>% 
+  filter(season == "Spring") %>% 
+  select(age_d, Fucose, `Man-URA`, blade) %>% 
+  pivot_longer(cols = Fucose: `Man-URA`,
+               names_prefix = "sugar",
+               values_to = "mol_percent") %>% 
+  mutate(age_d = as.factor(age_d))
+  
+boxplot_fucose_manURA_spring <- fucose_manURA_age_spring %>% 
+  ggplot(aes(x = age_d, y = mol_percent*100, fill = name)) +
+  geom_boxplot() +
+  labs(x = "Age (d)",
+       y = "Mol%",
+       fill = "") +
+  ggtitle(label = "Spring") + 
+  scale_fill_manual(values = c("steelblue1", "firebrick1")) +
+  geom_point( position=position_dodge(width=0.75)) +
+   theme(panel.background = element_rect(fill = "white", color = "black", size = 1.5),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        plot.margin = margin(1,1,1,1, "cm"),
+        strip.background = element_rect(fill = "white", color = "black"),
+        legend.key = element_rect(fill = "white"),
+        legend.text = element_text(size = 24),
+        plot.title = element_text(size = 24), 
+        legend.key.height = unit(0.5, "inch"),
+        legend.key.width = unit(0.4, "inch"),
+        legend.title = element_text(size = 20),
+        axis.text = element_text(size = 30, color = "black"),
+        axis.title = element_text(size = 30),
+        text = element_text(family = "Times"))
+
+
+
+
+```
+
+# Summary: Avg Sugar mol% in Mature vs. Senescent phase
+
+```{r}
+
+sugar_summary <- MP_DOM_Sugar %>% 
+  select(phase, season,Fucose:`Man-URA`) %>% 
+  pivot_longer(cols = Fucose: `Man-URA`,
+               names_prefix = "sugar",
+               values_to = "mol_percent")%>% 
+  group_by(phase, name, season) %>% 
+  summarize(mean_molp = mean(mol_percent),
+            sd_molp = sd(mol_percent))
+  
+sugars_fold_change_phys_state <- sugar_summary %>% 
+  group_by(name) %>% 
+  summarise(fold_change = mean_molp[phase == "Senescent"]/mean_molp[phase == "Mature"])
+
+sugars_fold_change_season <- sugar_summary %>% 
+  group_by(phase, name) %>% 
+  summarise(fold_change = mean_molp[season == "Spring"]/mean_molp[season == "Summer"])
+
+```
+
+
+# Glucosamine Mature (16 days) Box Plot between Spring and Summer
+
+
+```{r}
+
+glucosamine_season_mature <- MP_DOM_Sugar_mature %>% 
+  select(season, Glucoseamine, blade) %>% 
+  pivot_longer(cols = Glucoseamine,
+               names_prefix = "sugar",
+               values_to = "mol_percent") 
+  
+boxplot_glucosamine_season_mature <- glucosamine_season_mature %>% 
+  ggplot(aes(x = season, y = mol_percent*100)) +
+  geom_boxplot(fill = "grey") +
+  labs(x = "",
+       y = "Mol%",
+       fill = "") +
+  scale_fill_manual(values = c("grey")) +
+  geom_point( position=position_dodge(width=0.75)) +
+   theme(panel.background = element_rect(fill = "white", color = "black", size = 1.5),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        plot.margin = margin(1,1,1,1, "cm"),
+        strip.background = element_rect(fill = "white", color = "black"),
+        axis.text = element_text(size = 30, color = "black"),
+        axis.title = element_text(size = 30),
+        text = element_text(family = "Times"))
+
+
+
+```
+
+# Glucosamine age and season 
+
+```{r}
+
+MP_DOM_Sugar_glucosamine <- sugars %>% 
+  filter(age_d %in% c(16, 77, 78)) %>% 
+  select(age_d, season, blade, Glucoseamine) %>% 
+  mutate(phase = case_when(
+    age_d >= 50 ~ "Senescent",
+    age_d < 50 ~ "Mature"
+  ))
+
+
+glucosamine_season <- MP_DOM_Sugar_glucosamine %>% 
+  select(age_d, season, Glucoseamine, blade, phase) %>% 
+  pivot_longer(cols = Glucoseamine,
+               names_prefix = "sugar",
+               values_to = "mol_percent") 
+
+
+glucosamine_molp_boxplot <- glucosamine_season %>% 
+  ggplot() +
+  geom_boxplot(aes(x = season, y = mol_percent*100, fill = phase)) +
+  geom_point(aes(x = season, y = mol_percent*100, color = phase),
+             position = position_jitterdodge(0.1)) +
+  labs(y = "Glucosamine (mole%)",
+       x = "",
+       color = "",
+       fill = "") +
+  scale_fill_manual(values = c("#266A25","#BD9C3D")) +
+  scale_color_manual(values = c("darkgreen","darkgoldenrod")) +
+  scale_y_continuous(limits = c(0,20)) +
+  theme(panel.background = element_rect(fill = "white", 
+                                        color = "black", 
+                                        size = 1.5),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        plot.margin = margin(1,1,1,1, "cm"),
+        strip.background = element_rect(fill = "white", 
+                                        color = "black"),
+        legend.key = element_rect(fill = "white"),
+        legend.text = element_text(size = 15),
+        legend.title = element_blank(),
+        legend.position = c(0.72,0.75),
+        axis.text = element_text(size = 30, 
+                                 color = "black"),
+        axis.title = element_text(size = 30),
+        text = element_text(family = "Times"))
+
+# Two-way ANOVA Glucosamine vs. Season and Physiology
+
+
+aov.glucosamine.season.phase <- aov(data = MP_DOM_Sugar_glucosamine, Glucoseamine ~ season * phase)
+
+summary(aov.glucosamine.season.phase)
+
+TukeyHSD(aov.glucosamine.season.phase)
+
+
+```
+
+
+# Gluconic acid age and season 
+
+
+```{r}
+
+MP_DOM_Sugar_glcURA <- MP_DOM_Sugar %>% 
+  filter(age_d %in% c(16, 77, 78)) %>% 
+  select(age_d, season, blade, `Glc-URA`) 
+
+
+glcURA_season <- MP_DOM_Sugar_glcURA %>% 
+  select(age_d, season, `Glc-URA`, blade) %>% 
+  pivot_longer(cols = 'Glc-URA' ,
+               names_prefix = "sugar",
+               values_to = "mol_percent") 
+
+
+glcURA_molp_boxplot <- glcURA_season %>% 
+  mutate(phase = case_when(age_d < 50 ~ "Mature",
+                           age_d > 50 ~ "Senescent")) %>% 
+   ggplot(aes(phase, mol_percent)) +
+  geom_boxplot(position = "dodge") +
+  geom_point(size = 3) +
+  facet_wrap(~ season, strip.position = "bottom") +
+  theme_minimal() +
+   theme(panel.grid.major.x = element_blank(),
+        panel.grid.minor = element_blank(),
+        plot.margin = margin(1,1,1,1, "cm"),
+        strip.placement = "outside",
+        strip.background = element_rect(fill = "white", color = "white"),
+        legend.key = element_rect(fill = "white"),
+        legend.text = element_text(size = 20),
+        legend.key.height = unit(0.5, "inch"),
+        legend.key.width = unit(0.4, "inch"),
+        legend.title = element_text(size = 20),
+        axis.text = element_text(size = 20, color = "black"),
+        axis.title = element_text(size = 25),
+        text = element_text(family = "Times"),
+        strip.text = element_text(size = 20, face = "bold")) +
+  labs(x = "",
+       y = "Glc-URA (Mol%)")
+
+
+
+```
+

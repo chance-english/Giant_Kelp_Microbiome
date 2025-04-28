@@ -1,0 +1,326 @@
+---
+title: "Figures"
+author: "Chance English"
+date: "10/29/2024"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+# 
+```{r}
+
+library(cowplot)
+
+
+```
+
+# Figure 1
+
+## A
+
+```{r}
+
+season_phys_state_boxplot <- MP_chlC_sum %>% 
+  ggplot() +
+  geom_boxplot(aes(x = season, y = tissue_N_percent, fill = physio_state)) +
+  geom_point(aes(x = season, y = tissue_N_percent, color = physio_state),
+             position = position_jitterdodge()) +
+  labs(y = "Tissue Nitrogen (% DW)",
+       x = "") +
+  scale_fill_manual(values = c("#266A25","#BD9C3D")) +
+  scale_color_manual(values = c("darkgreen","darkgoldenrod")) +
+  theme(panel.background = element_rect(fill = "white", 
+                                        color = "black", 
+                                        size = 1.5),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        plot.margin = margin(1,1,1,1, "cm"),
+        strip.background = element_rect(fill = "white", 
+                                        color = "black"),
+        legend.key = element_rect(fill = "white"),
+        legend.text = element_text(size = 15),
+        legend.title = element_blank(),
+        legend.position = c(0.8,0.8),
+        axis.text = element_text(size = 20, 
+                                 color = "black"),
+        axis.title = element_text(size = 24),
+        text = element_text(family = "Times"))
+
+```
+
+
+## B 
+
+```{r}
+
+pca_plot <- fviz_pca_biplot(sug.pca1, 
+                level = "var",
+                habillage = sugars[1:42,]$phase, 
+                addEllipses = TRUE, 
+                ellipse.level = 0.95,
+                label = "var", labelsize = 5,
+                col.var = "black",
+                repel = T,
+                geom="point", pointsize = 5,
+                palette = c("#266A25","#BD9C3D")) +
+  labs(title = "", 
+       x = "PC1 (24%)",
+       y = "PC2 (24%)") +
+  scale_y_continuous(labels = label_number(accuracy = 1)) + 
+   theme(panel.background = element_rect(fill = "white", color = "black", size = 1.5),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        plot.margin = margin(1,1,1,1, "cm"),
+        strip.background = element_rect(fill = "white", color = "black"),
+        legend.key = element_rect(fill = "white"),
+        legend.text = element_text(size = 20),
+        legend.position = "none",
+        legend.title = element_blank(),
+        axis.text = element_text(size = 20, color = "black"),
+        axis.title = element_text(size = 24),
+        text = element_text(family = "Times"))
+
+```
+
+
+## C
+
+
+```{r}
+
+glucosamine_molp_boxplot <- glucosamine_season %>% 
+  ggplot() +
+  geom_boxplot(aes(x = season, y = mol_percent*100, fill = phase)) +
+  geom_point(aes(x = season, y = mol_percent*100, color = phase),
+             position = position_jitterdodge(0.1)) +
+  labs(y = "Glucosamine (mole%)",
+       x = "",
+       color = "",
+       fill = "") +
+  scale_fill_manual(values = c("#266A25","#BD9C3D")) +
+  scale_color_manual(values = c("darkgreen","darkgoldenrod")) +
+  scale_y_continuous(limits = c(0,20)) +
+  theme(panel.background = element_rect(fill = "white", 
+                                        color = "black", 
+                                        size = 1.5),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        plot.margin = margin(1,1,1,1, "cm"),
+        strip.background = element_rect(fill = "white", 
+                                        color = "black"),
+        legend.key = element_rect(fill = "white"),
+        legend.text = element_text(size = 15),
+        legend.title = element_blank(),
+        legend.position = "none",
+        axis.text = element_text(size = 20, 
+                                 color = "black"),
+        axis.title = element_text(size = 24),
+        text = element_text(family = "Times"))
+
+
+
+
+
+```
+
+## A,B,C Combines 
+
+```{r}
+
+figure1<- plot_grid(season_phys_state_boxplot,pca_plot, glucosamine_molp_boxplot ,labels = c('A','B','C'), label_size = 20, label_fontfamily = "Times New Roman", nrow = 1)
+
+ggsave("Figure1.tiff", plot = figure1, path = "/Users/chanceenglish/Desktop/Lab Shiz/ARPA-e/Giant_Kelp_Microbiome/Figures/", width = 15, height = 5, device='tiff', dpi=250, units = "in")
+
+
+
+```
+
+
+# Figure 2 
+
+## A
+
+```{r}
+
+Shannon_div_plot <- MP_biofilm_samples_richness%>%
+  ggplot(aes(x = age_d, y = Shannon, shape = season, color = phys_state)) +
+  geom_point(size = 5) +
+  scale_color_manual(values = c("#266A25","#BD9C3D")) +
+  labs(x = "Age (d)",
+       y = "Shannon Diversity",
+       shape = "",
+       color = "") +
+   stat_smooth(method = "lm", formula = y ~ poly(x, 2), size = 2, se = FALSE, color = "black") +
+   theme(panel.background = element_rect(fill = "white", color = "black", size = 1.5),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        plot.margin = margin(1,1,1,1, "cm"),
+        strip.background = element_rect(fill = "white", color = "black"),
+        legend.position = "none",
+        legend.key = element_rect(fill = "white"),
+        legend.text = element_text(size = 15),
+        legend.key.height = unit(0.5, "inch"),
+        legend.key.width = unit(0.2, "inch"),
+        legend.title = element_text(size = 20),
+        axis.text = element_text(size = 20, color = "black"),
+        axis.title = element_text(size = 24),
+        text = element_text(family = "Times")) 
+
+
+```
+
+
+## B
+
+```{r}
+
+NMDS_p_biofilm <- MP_Biofilm_Sample_Data_NMDS %>% 
+  ggplot(aes(x = NMDS1, y = NMDS2, color = phys_state, shape = season)) +
+  geom_point(size = 8) +
+  scale_color_manual(values = c("#266A25","#BD9C3D")) +
+  labs(shape = "",
+       color = "") +
+  theme(panel.background = element_rect(fill = "white", color = "black", size = 1.5),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        plot.margin = margin(1,1,1,1, "cm"),
+        strip.background = element_rect(fill = "white", color = "black"),
+        legend.position = "right",
+        legend.key = element_rect(fill = "white"),
+        legend.text = element_text(size = 15),
+        legend.key.height = unit(0.5, "inch"),
+        legend.key.width = unit(0.4, "inch"),
+        legend.title = element_text(size = 20),
+        axis.text = element_text(size = 20, color = "black"),
+        axis.title = element_text(size = 24),
+        text = element_text(family = "Times")) 
+
+
+
+
+
+```
+
+## A and B Combines
+
+```{r}
+
+figure2<- plot_grid(Shannon_div_plot, NMDS_p_biofilm,labels = c('A','B'), label_size = 24, label_fontfamily = "Times New Roman")
+
+ggsave("Figure2.tiff", plot = figure2, path = "/Users/chanceenglish/Desktop/Lab Shiz/ARPA-e/Giant_Kelp_Microbiome/Figures/", width = 15, height = 8, device='tiff', dpi=250, units = "in")
+
+
+
+
+```
+
+# Figure 3
+
+
+```{r}
+
+top10_families_plot <- family_RA_phys_long_top_families_top10 %>% 
+  ggplot() +
+  geom_boxplot(aes(y = reorder(family, RA), x = RA*100, fill = phys_state)) +
+  scale_fill_manual(values = c("#266A25","#BD9C3D")) +
+  labs(y = "",
+       x = "Relative Abundance (%)",
+       fill = "") +
+  theme(panel.background = element_rect(fill = "white", color = "black", size = 1.5),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        plot.margin = margin(1,1,1,1, "cm"),
+        strip.background = element_rect(fill = "white", color = "black"),
+        legend.key = element_rect(fill = "white"),
+        legend.text = element_text(size = 20),
+        legend.key.height = unit(0.5, "inch"),
+        legend.position = "top",
+        legend.key.width = unit(0.4, "inch"),
+        legend.title = element_text(size = 15),
+        axis.text = element_text(size = 20, color = "black"),
+        axis.title = element_text(size = 24),
+        text = element_text(family = "Times")) 
+
+
+
+ggsave("Figure3.tiff", plot = top10_families_plot, path = "/Users/chanceenglish/Desktop/Lab Shiz/ARPA-e/Giant_Kelp_Microbiome/Figures/", width = 10, height = 10, device='tiff', dpi=1000, units = "in")
+
+
+
+
+
+```
+
+
+# Figure 4
+
+## A
+
+
+```{r}
+
+library(ggcorrplot)
+library(pheatmap)
+
+sugars_ASV_corr_plot <- pheatmap(sugars_sigASV_cor_R250,
+         annotation_row = sig_taxa_RA_phylum_majority,
+         annotation_names_row = F, 
+         fontsize_row = 15, 
+         cluster_cols = TRUE,
+         fontsize_col = 15,
+         angle_col = 45,
+         fontfamily = "Times",
+         color = c("#001260", "#011A66", "#01226B" ,"#012A70", "#023275", "#023A7B", "#034280", "#034A85", "#05538A","#0A5C90", "#136697",
+                  "#1E6F9D", "#2B79A4", "#3A84AB", "#4A8FB2", "#5A9ABA", "#6AA4C1", "#7BAEC8", "#8CB9CF", "#9CC3D5", "#ADCDDD", "#BDD6E3",
+                  "#CDDFE7", "#DDE5E8", "#E7E7E5", "#EEE2DB", "#EEDACE", "#EBD0C1", "#E7C6B2", "#E3BCA5", "#DEB197", "#DAA78A", "#D69E7C",
+                  "#D29470", "#CE8B64", "#C98157", "#C5784B", "#C26E3F", "#BE6533", "#B85C28", "#B1501C", "#A84411", "#9D3709", "#912D05",
+                  "#872406", "#7D1C06", "#731405", "#6A0D06", "#620606", "#590007"))
+
+
+figure4A<- plot_grid(sugars_ASV_corr_plot,labels = c('A'), label_size = 15, label_fontfamily = "Times New Roman")
+
+ggsave("Figure4A.tiff", plot = sugars_ASV_corr_plot, path = "/Users/chanceenglish/Desktop/Lab Shiz/ARPA-e/Giant_Kelp_Microbiome/Figures/", width = 10, height = 10, device='tiff', dpi=1000, units = "in")
+
+
+
+
+
+```
+
+## B
+
+```{r}
+
+RA_sigtaxat_p <- sig_taxa_RA_df_majority_4sugars_long %>% 
+  filter(ASV != "NA") %>% 
+  ggplot(aes(x = RA*100, y = ASV)) + 
+  geom_point() +
+  labs(y = "",
+       x = "Relative Abundance (%)") +
+  scale_x_continuous(breaks = c(0,10,20,30,40,50,60)) +
+   theme(panel.background = element_rect(fill = "white", color = "black", size = 1.5),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        plot.margin = margin(1,1,1,1, "cm"),
+        strip.background = element_rect(fill = "white", color = "black"),
+        legend.key = element_rect(fill = "white"),
+        legend.text = element_text(size = 20),
+        legend.key.height = unit(0.5, "inch"),
+        legend.key.width = unit(0.4, "inch"),
+        legend.title = element_text(size = 24),
+        axis.text.y = element_blank(),
+        axis.text = element_text(size = 15, color = "black"),
+        axis.title = element_text(size = 20),
+        text = element_text(family = "Times")) 
+  
+figure4B<- plot_grid(RA_sigtaxat_p,labels = c('B'), label_size = 15, label_fontfamily = "Times New Roman")
+
+ggsave("Figure4B.tiff", plot = figure4B, path = "/Users/chanceenglish/Desktop/Lab Shiz/ARPA-e/Giant_Kelp_Microbiome/Figures/", width = 5, height = 10, device='tiff', dpi=1000, units = "in")
+
+
+```
+

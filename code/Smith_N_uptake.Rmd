@@ -1,0 +1,75 @@
+---
+title: "Smith_N_Uptake"
+author: "Chance English"
+date: "10/30/2024"
+output: html_document
+---
+
+
+```{r setup, include=FALSE, message=FALSE, echo=FALSE, warning=FALSE}
+knitr::opts_chunk$set(message = FALSE, echo = FALSE, warning = FALSE)
+```
+
+
+```{r,include=FALSE, message=FALSE, echo=FALSE, warning=FALSE}
+
+library(tidyverse)
+library(dada2)
+library(ShortRead)
+library(beepr)
+library(phyloseq)
+library(ggplot2)
+library(dplyr)
+library(RColorBrewer)
+library(tidyverse)
+library(here)
+library(ggpubr)
+library(janitor)
+library(ggsci)
+library(lubridate)
+library(readxl)
+library(growthcurver)
+library(zoo)
+library(scales)
+library(kableExtra)
+library(broom)
+library(reshape2)
+library(vegan)
+library(indicspecies)
+library(readr)
+library(ggrepel)
+library(DESeq2)
+
+#library(cowplot)
+
+```
+
+
+# N_Uptake_Data
+
+```{r}
+
+
+N_uptake <- read_csv(here("Outputdata", "MK_N_uptake_rates_Smith2018.csv"))
+
+
+```
+
+# Summary 
+
+```{r}
+
+
+N_uptake %>% 
+  group_by(Date, `Blade Replicate`) %>% 
+  summarize(sum_N = sum(N_uptake_umol_g_hr)) %>% 
+  ungroup() %>% 
+  group_by(Date) %>% 
+  summarize(mean_N = mean(sum_N),
+            sd_N = sd(sum_N))
+
+
+
+
+```
+

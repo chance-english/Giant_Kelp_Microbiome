@@ -1,0 +1,3041 @@
+---
+title: "MP_Exudate"
+author: "Chance English"
+date: "11/30/2023"
+output: html_document
+---
+
+
+```{r setup, include=FALSE, echo=F, warning=F, message=F}
+knitr::opts_chunk$set(echo = TRUE, message = F, echo = F, warning = F)
+```
+
+```{r, include=FALSE, echo=F, warning=F, message=F}
+
+
+
+library(tidyverse)
+library(lmodel2)
+library(ggplot2)
+library(readxl)
+library(kableExtra)
+library(scales)
+library(factoextra)
+library(mgcv)
+library(janitor)
+library(broom)
+library(here)
+library(rstatix)
+library(ggpubr)
+library(vegan)
+library(ggbump)
+library(RColorBrewer)
+library(scico)
+library(sicegar)
+
+```
+
+# Load Data 
+
+```{r, include=FALSE, echo=F, warning=F, message=F}
+
+
+MP_DOC_NPP_phys_env_sum <- read_csv(here("Outputdata", "MP_DOC_NPP_phys_env_sum.csv"))
+
+
+
+
+
+```
+
+
+# Total DOC vs NPP 
+
+
+```{r}
+
+
+doc_NPP <- MP_DOC_NPP_phys_env_sum %>%
+  filter(flag != 2) %>% 
+  filter(season %in% c("Spring", "Summer")) %>% 
+  ggplot(aes(x = NPP_umolC_g_hr, y = DOC_umolC_g_hr)) +
+  geom_point(aes(color = age_d), size = 7) +
+  ylab(expression(DOC~Production~(µmolC ~ g[DW]^{"-1"} ~ hr^{"-1"}))) +
+  xlab(expression(NPP~(µmolC ~ g[DW]^{"-1"} ~ hr^{"-1"}))) +
+  labs(color = "Age (d)") +
+  geom_abline(intercept = 0, slope = 1, linetype = "dashed", size = 2) +
+  geom_abline(intercept = 0.82, slope = 0.023, size = 2) +
+  scico::scale_color_scico(palette = "vik", breaks = c(0,25,50,75,100)) +
+  scale_x_continuous(breaks = c(0,100,200,300), limits = c(-30,300)) +
+  theme(panel.background = element_rect(fill = "white", color = "black", size = 1.5),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        plot.margin = margin(1,1,1,1, "cm"),
+        strip.background = element_rect(fill = "white", color = "black"),
+        legend.key = element_rect(fill = "white"),
+        legend.text = element_text(size = 20),
+        legend.key.height = unit(0.8, "inch"),
+        legend.key.width = unit(0.4, "inch"),
+        legend.title = element_text(size = 24),
+        axis.text = element_text(size = 30, color = "black"),
+        axis.title = element_text(size = 25),
+        text = element_text(family = "Times")) 
+
+ 
+
+PER_NPP <- MP_DOC_NPP_phys_env_sum %>% 
+  filter(flag != 2) %>% 
+  filter(season %in% c("Spring", "Summer")) %>% 
+  filter(lightlevel_timepoint != 1) %>% 
+  filter(DOC_umolC_g_hr > 0 & NPP_umolC_g_hr > 10) %>% 
+  ggplot(aes(x = NPP_umolC_g_hr, y = (DOC_umolC_g_hr/NPP_umolC_g_hr)*100)) +
+  geom_point(aes(color = age_d, shape = season), size = 7) +
+  labs(y = "Percent Extracellular Release",
+       shape = "") +
+  xlab(expression(NPP~(µmolC ~ g[DW]^{"-1"} ~ hr^{"-1"}))) +
+  scale_shape_manual(values = c(19,17)) +
+  labs(color = "Age (d)") +
+  scale_y_log10() +
+  scico::scale_color_scico(palette = "vik", breaks = c(0,25,50,75,100)) +
+  scale_x_log10() +
+  theme(panel.background = element_rect(fill = "white", color = "black", size = 1.5),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        plot.margin = margin(1,1,1,1, "cm"),
+        strip.background = element_rect(fill = "white", color = "black"),
+        legend.key = element_rect(fill = "white"),
+        legend.text = element_text(size = 20),
+        legend.key.height = unit(0.4, "inch"),
+        legend.key.width = unit(0.4, "inch"),
+        legend.title = element_text(size = 24),
+        axis.text = element_text(size = 30, color = "black"),
+        axis.title = element_text(size = 25),
+        text = element_text(family = "Times")) 
+
+
+
+
+```
+
+
+# Mature (not senescent) DOC vs NPP 
+
+
+```{r}
+
+doc_NPP_mature <- MP_DOC_NPP_phys_env_sum %>% 
+  filter(season %in% c("Spring", "Summer")) %>% 
+  filter(flag != 2) %>% 
+  filter(age_d <= 50) %>% 
+  ggplot(aes(x = NPP_umolC_g_hr, y = DOC_umolC_g_hr, color = PAR)) +
+  geom_point(size = 7) +
+  ylab(expression(DOC~Production~(µmolC ~ g[DW]^{"-1"} ~ hr^{"-1"}))) +
+  xlab(expression(NPP~(µmolC ~ g[DW]^{"-1"} ~ hr^{"-1"}))) +
+  labs(color = "PAR") + 
+  scale_y_continuous(labels = label_number(accuracy = 1), limits = c(0,10), breaks = c(0,5,10)) +
+  scale_x_continuous(limits = c(-50,300),breaks = c(0,100,200,300)) +
+   scale_color_viridis_b(breaks = c(0,50,100,250,500,1000,1500), limits = c(0,1500), name = expression(paste("PAR (µmol ",m^-2, s^-1,")"))) +
+  geom_abline(slope = 0.023, intercept = 0.82, size = 2) +
+   theme(panel.background = element_rect(fill = "white", color = "black", size = 1.5),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        plot.margin = margin(1,1,1,1, "cm"),
+        strip.background = element_rect(fill = "white", color = "black"),
+        legend.key = element_rect(fill = "white"),
+        legend.text = element_text(size = 20),
+        legend.key.height = unit(0.7, "inch"),
+        legend.key.width = unit(0.4, "inch"),
+        legend.title = element_text(size = 24),
+        axis.text = element_text(size = 30, color = "black"),
+        axis.title = element_text(size = 25),
+        text = element_text(family = "Times"))
+
+# Log 10 transformed rates 
+
+doc_NPP_mature_log10 <- MP_DOC_NPP_phys_env_sum %>% 
+  filter(season %in% c("Spring", "Summer")) %>% 
+  filter(PAR > 10) %>% 
+  filter(flag != 2) %>% 
+  filter(age_d <= 50) %>% 
+  filter(log10(DOC_umolC_g_hr) >= -2) %>% 
+  ggplot(aes(x = log10(NPP_umolC_g_hr), y = log10(DOC_umolC_g_hr))) +
+  geom_point(size = 7) +
+  ylab(expression(DOC~Production~(µmolC ~ g[DW]^{"-1"} ~ hr^{"-1"}))) +
+  xlab(expression(NPP~(µmolC ~ g[DW]^{"-1"} ~ hr^{"-1"}))) +
+  labs(color = "Age (d)") + 
+  geom_smooth(method = "lm") +
+  theme(panel.background = element_rect(fill = "white", color = "black", size = 1.5),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        plot.margin = margin(1,1,1,1, "cm"),
+        strip.background = element_rect(fill = "white", color = "black"),
+        legend.key = element_rect(fill = "white"),
+        legend.text = element_text(size = 20),
+        legend.key.height = unit(0.5, "inch"),
+        legend.key.width = unit(0.4, "inch"),
+        legend.title = element_text(size = 20),
+        axis.text = element_text(size = 20, color = "black"),
+        axis.title = element_text(size = 25),
+        text = element_text(family = "Times"))
+
+
+
+
+
+
+```
+
+
+
+# Summary Stats DOC Release Rates by Season, Physiological State
+
+```{r}
+
+DOC_rate_sum <- MP_DOC_NPP_phys_env_sum %>% 
+  filter(flag != 2 & season %in% c("Spring", "Summer")) %>% 
+  mutate(phys_state = case_when(
+    age_d < 50 ~ "Mature",
+    age_d >= 50 ~ "Senescent"
+  )) %>%
+  group_by(season, phys_state) %>% 
+  select(DOC = DOC_umolC_g_hr) 
+
+DOC_rate_phys_state_sum <- 
+  DOC_rate_sum %>% 
+  group_by(phys_state) %>% 
+  summarize(mean_DOC = mean(DOC),
+            sd_DOC = sd(DOC),
+            min_DOC = min(DOC), 
+            max_DOC = max(DOC))
+
+
+doc_season_phys_state_boxplot <- DOC_rate_sum %>% 
+  ggplot() +
+  geom_boxplot(aes(x = season, y = DOC, fill = phys_state)) + 
+  scale_fill_manual(values = c("#266A25","#BD9C3D")) +
+  scale_color_manual(values = c("darkgreen","darkgoldenrod")) +
+  labs(x = "") + 
+  ylab(expression(DOC~Production~(µmolC ~ g[DW]^{"-1"} ~ hr^{"-1"}))) +
+  theme(panel.background = element_rect(fill = "white", 
+                                        color = "black", 
+                                        size = 1.5),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        plot.margin = margin(1,1,1,1, "cm"),
+        strip.background = element_rect(fill = "white", 
+                                        color = "black"),
+        legend.key = element_rect(fill = "white"),
+        legend.text = element_text(size = 15),
+        legend.title = element_blank(),
+        legend.position = "top",
+        axis.text = element_text(size = 30, 
+                                 color = "black"),
+        axis.title = element_text(size = 30),
+        text = element_text(family = "Times"))
+
+
+# Two Sample t-test: C:N content of mature kelp in Spring vs. Summer
+
+
+## Test for Normality
+
+mature_DOC <- DOC_rate_sum %>% 
+  filter(phys_state == "Mature") 
+
+with(mature_DOC, shapiro.test(DOC[season == "Summer"])) # p = 0.0129 = not-normal
+
+with(mature_DOC, shapiro.test(DOC[season == "Spring"])) # p = 0.013 = not-normal
+
+# DOC Release Rates Mature Kelp 
+
+res_DOC_mature_season <- wilcox.test(mature_DOC$DOC[mature_DOC$season == "Summer"],mature_DOC$DOC[mature_DOC$season == "Spring"])
+
+res_DOC_mature_season # p = 0.6836, no significant difference in DOC release rates summer vs spring 
+
+
+## Test for Normality: Senescent Kelp by season
+
+senescent_DOC <- DOC_rate_sum %>% 
+  filter(phys_state == "Senescent") 
+
+with(senescent_DOC, shapiro.test(DOC[season == "Summer"])) # p <0.001= not-normal
+
+with(senescent_DOC, shapiro.test(DOC[season == "Spring"])) # p < 0.001 = not-normal
+
+# DOC Release Rates Mature Kelp 
+
+res_DOC_senescent_season <- wilcox.test(senescent_DOC$DOC[senescent_DOC$season == "Summer"],senescent_DOC$DOC[senescent_DOC$season == "Spring"])
+
+res_DOC_senescent_season # p = 0.6836, no significant difference in DOC release rates summer vs spring 
+
+
+## Test for Normality: Senescent Kelp by season: Summer
+
+summer_DOC <- DOC_rate_sum %>% 
+  filter(season == "Summer") 
+
+with(summer_DOC, shapiro.test(DOC[phys_state == "Mature"])) # p <0.001= not-normal
+
+with(summer_DOC, shapiro.test(DOC[phys_state == "Senescent"])) # p < 0.001 = not-normal
+
+# DOC Release Rates Mature Kelp 
+
+res_Summer_DOC_mature_v_senescent <- wilcox.test(summer_DOC$DOC[summer_DOC$phys_state == "Mature"],summer_DOC$DOC[summer_DOC$phys_state == "Senescent"])
+
+res_Summer_DOC_mature_v_senescent # W = 189.5, p = 8.712e-10 ***
+
+
+## Test for Normality: Senescent Kelp by season: Spring
+
+spring_DOC <- DOC_rate_sum %>% 
+  filter(season == "Spring") 
+
+with(spring_DOC, shapiro.test(DOC[phys_state == "Mature"])) # p <0.001= not-normal
+
+with(spring_DOC, shapiro.test(DOC[phys_state == "Senescent"])) # p < 0.001 = not-normal
+
+# DOC Release Rates Mature Kelp 
+
+res_Spring_DOC_mature_v_senescent <- wilcox.test(spring_DOC$DOC[spring_DOC$phys_state == "Mature"],spring_DOC$DOC[spring_DOC$phys_state == "Senescent"])
+
+res_Spring_DOC_mature_v_senescent # W = 275, p = 2.709 e-05 ***
+
+
+
+```
+
+
+# Nitrate and dry mass Normalized NPP at saturating irradiance over age
+
+
+```{r}
+
+NPP_age_season_Pmax <- MP_DOC_NPP_phys_env_sum %>% 
+  filter(flag != 2, PAR >= 400, season %in% c("Summer", "Spring")) %>% 
+  group_by(age_d, season) %>% 
+  summarize(NPP = mean(NPP_umolC_g_hr),
+            NPP_sd = sd(NPP_umolC_g_hr),
+            nitrate = mean(N_N_uM),
+            nitrate_sd = mean(N_N_uM),
+            NPP_nitrate = NPP/nitrate,
+            NPP_nitrate_sd = sqrt((NPP_sd^2/NPP)+ (nitrate_sd^2/nitrate))) %>%
+  ungroup() %>% 
+  ggplot(aes(x = age_d, y = NPP, color = season)) +
+  geom_point(size = 7) +
+  geom_errorbar(aes(ymin = NPP - NPP_sd, ymax = NPP + NPP_sd, color = season), width = 0 ) +
+  geom_smooth(method = "lm", se = FALSE,aes(color = season)) +
+  ylab(expression(P[max]~(µmolC ~ g[DW]^{"-1"} ~ hr^{"-1"}))) +
+  scale_color_manual(values = c("red", "black")) +
+  labs(x = "Age (d)",
+       color = "") + 
+  theme(panel.background = element_rect(fill = "white", color = "black", size = 1.5),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        plot.margin = margin(1,1,1,1, "cm"),
+        strip.background = element_rect(fill = "white", color = "black"),
+        legend.key = element_rect(fill = "white"),
+        legend.text = element_text(size = 20),
+        legend.key.height = unit(1, "inch"),
+        legend.key.width = unit(0.4, "inch"),
+        legend.title = element_text(size = 1),
+        legend.position = c(0.8,0.75),
+        axis.text = element_text(size = 30, color = "black"),
+        axis.title = element_text(size = 25),
+        text = element_text(family = "Times"))
+
+
+# NO3 normalized rates
+
+
+NPP_age_season_Pmax <- MP_DOC_NPP_phys_env_sum %>% 
+  filter(flag != 2, PAR >= 400, season %in% c("Summer", "Spring")) %>% 
+  group_by(age_d, season) %>% 
+  summarize(NPP = mean(NPP_umolC_g_hr),
+            NPP_sd = sd(NPP_umolC_g_hr),
+            nitrate = mean(N_N_uM),
+            nitrate_sd = mean(N_N_uM),
+            NPP_nitrate = NPP/nitrate,
+            NPP_nitrate_sd = sqrt((NPP_sd^2/NPP)+ (nitrate_sd^2/nitrate))) %>%
+  ungroup() %>% 
+  ggplot(aes(x = age_d, y = NPP, color = season)) +
+  geom_point(size = 7) +
+  geom_errorbar(aes(ymin = NPP - NPP_sd, ymax = NPP + NPP_sd, color = season), width = 0 ) +
+  geom_smooth(method = "lm", se = FALSE,aes(color = season)) +
+  ylab(expression(NPP~(µmolC ~ g[DW]^{"-1"} ~ hr^{"-1"} ~ NO["3"]^{"-"}^{"-1"}))) +
+  labs(x = "Age (d)") + 
+  theme(panel.background = element_rect(fill = "white", color = "black", size = 1.5),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        plot.margin = margin(1,1,1,1, "cm"),
+        strip.background = element_rect(fill = "white", color = "black"),
+        legend.key = element_rect(fill = "white"),
+        legend.text = element_text(size = 20),
+        legend.key.height = unit(1, "inch"),
+        legend.key.width = unit(0.4, "inch"),
+        legend.title = element_text(size = 24),
+        axis.text = element_text(size = 30, color = "black"),
+        axis.title = element_text(size = 25),
+        text = element_text(family = "Times"))
+
+
+
+```
+
+
+# NPP over Age with PAR 
+
+
+```{r}
+
+MP_NPP_age_par <- MP_DOC_NPP_phys_env_sum %>% 
+  filter(season %in% c("Spring", "Summer")) %>% 
+  filter(flag != 2) %>% 
+  ggplot(aes(y = NPP_umolC_g_hr, x = age_d)) +
+  geom_point(aes(color = PAR, shape = season), size = 7) +
+  ylab(expression(NPP~(µmolC ~ g[DW]^{"-1"} ~ hr^{"-1"}))) +
+  labs(color = "PAR",
+       x = "Age (d)",
+       shape = "") + 
+  scale_x_continuous(limits = c(10,90), breaks = c(25,50,75)) +
+  scale_y_continuous(limits = c(-50,300), breaks = c(0,100,200,300)) +
+  geom_hline(yintercept = 0, color = "black", size= 1, linetype = "dashed") +
+  theme(panel.background = element_rect(fill = "white", 
+                                        color = "black", 
+                                        size = 1.5),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        plot.margin = margin(1,1,1,1, "cm"),
+        legend.key.height = unit(0.7, "inch"),
+        legend.key.width = unit(0.4, "inch"),
+        strip.background = element_rect(fill = "white", 
+                                        color = "black"),
+        legend.key = element_rect(fill = "white"),
+        legend.text = element_text(size = 20),
+        legend.title = element_text(size = 20),
+        axis.text = element_text(size = 30, 
+                                 color = "black"),
+        axis.title = element_text(size = 30),
+        text = element_text(family = "Times")) +
+  scale_shape_manual(values = c(19,17)) +
+  scale_color_viridis_b(breaks = c(0,50,100,250,500,1000,1500), limits = c(0,1500), name = expression(paste("PAR (µmol ",m^-2, s^-1,")"))) +
+  guides(shape = "none")
+
+
+
+
+
+```
+
+# OLS, Maximum Rates of NPP vs Age both seasons 
+
+```{r}
+
+# Spring 
+
+MP_NPP_age_Spring <- MP_DOC_NPP_phys_env_sum %>% 
+  filter(season %in% c("Spring", "Summer")) %>% 
+  filter(flag != 2) %>% 
+  filter(lightlevel_timepoint %in% c(5,6), season == "Spring") %>% 
+  select(age_d, NPP_umolC_g_hr)
+
+
+
+OLS_NPP_age_Spring <- lm(NPP_umolC_g_hr ~ age_d, data = MP_NPP_age_Spring)
+summary(OLS_NPP_age_Spring)
+
+
+# Summer 
+
+MP_NPP_age_Summer <- MP_DOC_NPP_phys_env_sum %>% 
+  filter(season %in% c("Spring", "Summer")) %>% 
+  filter(flag != 2) %>% 
+  filter(lightlevel_timepoint %in% c(5,6), season == "Summer") %>% 
+  select(age_d, NPP_umolC_g_hr)
+
+OLS_NPP_age_Summer <- lm(NPP_umolC_g_hr ~ age_d, data = MP_NPP_age_Summer)
+summary(OLS_NPP_age_Summer)
+
+
+# Plot Pmax vs Age for Both Seasons 
+
+MP_Pmax_Age_p <- MP_DOC_NPP_phys_env_sum %>% 
+  filter(season %in% c("Spring", "Summer")) %>% 
+  filter(flag != 2) %>% 
+  filter(lightlevel_timepoint %in% c(5,6)) %>% 
+  select(age_d, NPP_umolC_g_hr, season) %>% 
+  ggplot(aes(y = NPP_umolC_g_hr, x = age_d)) +
+  geom_point(aes(shape = season, color = season), size = 7) +
+  ylab(expression(NPP~(µmolC ~ g[DW]^{"-1"} ~ hr^{"-1"}))) +
+  labs(color = "",
+       x = "Age (d)",
+       shape = "") +
+  scale_color_manual(values = c("red", "black"), guide = "none") +
+  geom_abline(slope = -3.22, intercept = 260.73, size = 2, color = "black") +
+  geom_abline(slope = -1.34, intercept = 176.64, size = 2, color = "red") +
+  scale_x_continuous(limits = c(10,80), breaks = c(0,25,50,75)) +
+  scale_y_continuous(limits = c(-50,300), breaks = c(0,100,200,300)) +
+  geom_hline(yintercept = 0, color = "black", size= 1, linetype = "dashed") +
+  theme(panel.background = element_rect(fill = "white", 
+                                        color = "black", 
+                                        size = 1.5),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        plot.margin = margin(1,1,1,1, "cm"),
+        legend.key.height = unit(0.7, "inch"),
+        legend.key.width = unit(0.4, "inch"),
+        strip.background = element_rect(fill = "white", 
+                                        color = "black"),
+        legend.key = element_rect(fill = "white"),
+        legend.text = element_text(size = 20),
+        legend.title = element_text(size = 20),
+        axis.text = element_text(size = 30, 
+                                 color = "black"),
+        axis.title = element_text(size = 30),
+        text = element_text(family = "Times")) +
+  scale_shape_manual(values = c(19,17))
+
+
+```
+
+
+
+# NPP over Age with PAR 
+
+
+```{r}
+
+NPP_par <- MP_DOC_NPP_phys_env_sum %>% 
+  filter(season %in% c("Spring", "Summer")) %>% 
+  filter(flag != 2) %>% 
+  group_by(age_d, season, lightlevel_timepoint) %>% 
+  mutate(mean_PAR = mean(PAR),
+         mean_NPP = mean(NPP_umolC_g_hr),
+         sd_PAR = sd(PAR),
+         sd_NPP = sd(NPP_umolC_g_hr)) %>% 
+  ggplot(aes(y = mean_NPP, x = mean_PAR, group = interaction(age_d, season))) +
+  labs(color = "Age (d)") +
+  geom_point(aes(shape = season, color = age_d), size = 7) +
+  geom_line(aes(color = age_d), size = 1) +
+  geom_errorbar(aes(xmin = mean_PAR - sd_PAR, xmax = mean_PAR + sd_PAR, ymin = mean_NPP - sd_NPP, ymax = mean_NPP + sd_NPP), width = 0, alpha = 0.1) +
+  scale_shape_manual(values = c(19,17), guide = "none") +
+  scico::scale_color_scico(palette = "vik", breaks = c(0,25,50,75,100)) +
+  ylab(expression(NPP~(µmolC ~ g[DW]^{"-1"} ~ hr^{"-1"}))) +
+  xlab(expression(paste("PAR (µmol ",m^-2, s^-1,")"))) +
+  scale_x_continuous(limits = c(0,1550), breaks = c(0,300,600,900,1200,1600)) +
+  scale_y_continuous(limits = c(-50,300), breaks = c(0,100,200,300)) +
+  geom_hline(yintercept = 0, color = "black", size= 1, linetype = "dashed") +
+  theme(panel.background = element_rect(fill = "white", 
+                                        color = "black", 
+                                        size = 1.5),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        plot.margin = margin(1,1,1,1, "cm"),
+        legend.key.height = unit(0.7, "inch"),
+        legend.key.width = unit(0.4, "inch"),
+        strip.background = element_rect(fill = "white", 
+                                        color = "black"),
+        legend.key = element_rect(fill = "white"),
+        legend.text = element_text(size = 20),
+        legend.title = element_text(size = 20),
+        axis.text = element_text(size = 30, 
+                                 color = "black"),
+        axis.title = element_text(size = 30),
+        text = element_text(family = "Times")) #
+  scale_color_viridis_b(breaks = c(0,50,100,250,500,1000,1500), limits = c(0,1500)) #, name = expression(paste("PAR (µmol ",m^-2, s^-1,")"))) +
+  guides(shape = "none")
+
+
+
+```
+
+# Respiration Rates when PAR = 0
+
+```{r}
+
+respiration <- MP_DOC_NPP_phys_env_sum_flags %>% 
+  filter(PAR == 0) %>% 
+  select(age_d, season, NPP_umolC_g_hr)
+
+respiration_spring <- respiration %>% 
+  filter(season == "Spring")
+
+respiration_summer <- respiration %>% 
+  filter(season == "Summer")
+
+spring_respiration_lm_age <- lm(NPP_umolC_g_hr ~ age_d, data = respiration_spring)
+
+summary(spring_respiration_lm_age)
+
+summer_respiration_lm_age <- lm(NPP_umolC_g_hr ~ age_d, data = respiration_summer)
+
+summary(summer_respiration_lm_age)
+
+```
+
+
+# Summary Table for Each Sampling Period
+
+```{r}
+
+table_1_sum <- MP_DOC_NPP_phys_env_sum %>% 
+  filter(flag != 2 & season %in% c("Spring", "Summer")) %>% 
+  group_by(season, date, age_d) %>% 
+  summarize(n = 6, 
+    blade = blade,
+    lightlevel_timepoint = lightlevel_timepoint,
+    mean_CN = round(mean(C_N),1),
+    sd_CN = round(sd(C_N),1),
+    min_PAR = round(min(PAR),0),
+    max_PAR = round(max(PAR),0),
+    mean_ChlC = round(mean(Chl_C*1000),1),
+    sd_ChlC = round(sd(Chl_C *1000),1),
+    min_DOC = round(min(DOC_umolC_g_hr),1),
+    max_DOC = round(max(DOC_umolC_g_hr),1),
+    min_NPP = round(min(NPP_umolC_g_hr),1),
+    max_NPP = round(max(NPP_umolC_g_hr),1)
+  ) %>% 
+  filter(blade == 1 & lightlevel_timepoint == 1) %>% 
+  select(-c(blade, lightlevel_timepoint)) %>% 
+  mutate(CN = paste(mean_CN, sd_CN, sep = " ± "),
+         ChlC = paste(mean_ChlC, sd_ChlC, sep = " ± "),
+        PAR_range = paste(min_PAR, max_PAR, sep = " - "),
+         NPP_range = paste(min_NPP, max_NPP, sep = " - "),
+        DOC_range = paste(min_DOC, max_DOC, sep = " - ")) %>% 
+  select(-c(min_DOC, max_DOC, 
+            min_NPP, max_NPP, 
+            min_PAR, max_PAR, 
+            mean_CN, sd_CN, 
+            mean_ChlC, sd_ChlC)) %>% 
+  arrange(season, age_d)
+
+table_1_sum
+
+
+write_excel_csv(table_1_sum, "/Users/chanceenglish/Desktop/Lab Shiz/ARPA-e/Giant_Kelp_DOC/Data/table_1_sum.csv")
+
+table_1 <- kableExtra::kbl(table_1_sum,
+                booktabs = TRUE,
+                col.names = c("Season", 
+                              "Date",
+                              "Age (d)",
+                              "N",
+                              "Blade C:N",
+                              "Blade Chl:C",
+                              "$PAR~(µmol~m^{2}~s^{-1})$",
+                              "$NPP~(µmolC~g_{DW}^{-1}~hr^{-1})$",
+                              "$DOC~(µmolC~g_{DW}^{-1}~hr^{-1})$")) %>% 
+  kable_classic(html_font = "Times New Roman",
+                  full_width = F) %>% 
+  kable_styling(font_size = 20)
+
+
+```
+
+
+
+# NLS exponential model fit for DOC production and age: Summer
+
+
+```{r}
+
+# Model DOC Spring and SUmmer over Age
+
+MP_DOC_NPP_phys_env_SUMMER <- MP_DOC_NPP_phys_env_sum %>% 
+  filter(flag != 2) %>% 
+  filter(lightlevel_timepoint %in% c(5,6)) %>% 
+  filter(season == "Summer") %>% 
+  group_by(age_d) %>% 
+  summarize(DOC_p_mean = mean(DOC_umolC_g_hr),
+            DOC_p_sd = sd(DOC_umolC_g_hr)) 
+
+
+
+# Select an approximate $\theta$, since theta must be lower than min(y), and greater than zero
+theta.0 <- min(MP_DOC_NPP_phys_env_SUMMER$DOC_p_mean) *0.99 
+
+# Estimate the rest parameters using a linear model
+model.0 <- lm(log(DOC_p_mean - theta.0) ~ age_d, data=MP_DOC_NPP_phys_env_SUMMER)  
+alpha.0 <- exp(coef(model.0)[1])
+beta.0 <- coef(model.0)[2]
+
+# Starting parameters
+start <- list(alpha = alpha.0, beta = beta.0, theta = theta.0)
+start
+
+model_nls_SUMMER_DOC_age <- nls(DOC_p_mean ~ alpha * exp(beta * age_d) + theta , data = MP_DOC_NPP_phys_env_SUMMER, start = start)
+
+plot(MP_DOC_NPP_phys_env_SUMMER$age_d, MP_DOC_NPP_phys_env_SUMMER$DOC_p_mean)
+lines(MP_DOC_NPP_phys_env_SUMMER$age_d, predict(model_nls_SUMMER_DOC_age, list(x= MP_DOC_NPP_phys_env_SUMMER$age_d)))
+
+
+
+
+
+```
+
+
+# NLS exponential model fit for DOC production and age: Spring
+
+
+```{r}
+
+# Model DOC Spring and SUmmer over Age
+
+MP_DOC_NPP_phys_env_Spring <- MP_DOC_NPP_phys_env_sum %>% 
+  filter(flag != 2) %>% 
+  filter(lightlevel_timepoint %in% c(5,6)) %>% 
+  filter(season == "Spring") %>% 
+  group_by(age_d) %>% 
+  summarize(DOC_p_mean = mean(DOC_umolC_g_hr),
+            DOC_p_sd = sd(DOC_umolC_g_hr)) 
+
+
+# Select an approximate $\theta$, since theta must be lower than min(y), and greater than zero
+theta.spring <- min(MP_DOC_NPP_phys_env_Spring$DOC_p_mean) *0.99 
+
+# Estimate the rest parameters using a linear model
+model.spring <- lm(log(DOC_p_mean - theta.spring) ~ age_d, data=MP_DOC_NPP_phys_env_SUMMER)  
+alpha.spring <- exp(coef(model.spring)[1])
+beta.spring <- coef(model.spring)[2]
+
+# Starting parameters
+start.spring <- list(alpha = alpha.spring, beta = beta.spring, theta = theta.spring)
+start.spring
+
+model_nls_Spring_DOC_age <- nls(DOC_p_mean ~ alpha * exp(beta * age_d) + theta , data = MP_DOC_NPP_phys_env_Spring, start = start.spring)
+
+plot(MP_DOC_NPP_phys_env_Spring$age_d, MP_DOC_NPP_phys_env_Spring$DOC_p_mean) +
+lines(MP_DOC_NPP_phys_env_Spring$age_d, predict(model_nls_Spring_DOC_age, list(x= MP_DOC_NPP_phys_env_Spring$age_d)))
+
+
+
+
+
+```
+
+
+# Plot DOC Production vs. Age for Spring and Summer w/ NLS Exponential Fits
+
+
+```{r}
+
+
+spring_summer_DOC_age_nls_fit_plot <- ggplot() +
+  geom_point(aes(x = MP_DOC_NPP_phys_env_SUMMER$age_d, y = MP_DOC_NPP_phys_env_SUMMER$DOC_p_mean,  color = "Summer"), size = 3) +
+  geom_point(aes(x = MP_DOC_NPP_phys_env_Spring$age_d, y = MP_DOC_NPP_phys_env_Spring$DOC_p_mean, color = "Spring"), size = 3) +
+  geom_smooth(aes(x = MP_DOC_NPP_phys_env_SUMMER$age_d, y = MP_DOC_NPP_phys_env_SUMMER$DOC_p_mean),
+    method = "nls", se = FALSE,
+    formula = y ~ a * exp(b * x),
+    method.args = list(start = c(a = 0.022, b = 0.0875)), color = "black") +
+   geom_smooth(aes(x = MP_DOC_NPP_phys_env_Spring$age_d, y = MP_DOC_NPP_phys_env_Spring$DOC_p_mean),
+    method = "nls", se = FALSE,
+    formula = y ~ a * exp(b * x),
+    method.args = list(start = c(a = 0.0235, b = 0.086)), color = "blue") +
+  geom_errorbar(aes(x = MP_DOC_NPP_phys_env_Spring$age_d,
+                    y = MP_DOC_NPP_phys_env_Spring$DOC_p_mean,
+                    ymin = MP_DOC_NPP_phys_env_Spring$DOC_p_mean - MP_DOC_NPP_phys_env_Spring$DOC_p_sd, 
+                     ymax =  MP_DOC_NPP_phys_env_Spring$DOC_p_mean + MP_DOC_NPP_phys_env_Spring$DOC_p_sd,
+                    color = "Spring"),
+                width = 0) +
+  geom_errorbar(aes(x = MP_DOC_NPP_phys_env_SUMMER$age_d, 
+                    y = MP_DOC_NPP_phys_env_SUMMER$DOC_p_mean,
+                    ymin = MP_DOC_NPP_phys_env_SUMMER$DOC_p_mean - MP_DOC_NPP_phys_env_SUMMER$DOC_p_sd, 
+                    ymax = MP_DOC_NPP_phys_env_SUMMER$DOC_p_mean + MP_DOC_NPP_phys_env_SUMMER$DOC_p_sd,
+                    color = "Summer"), 
+                width = 0) +
+  ylab(expression(DOC~Production~(µmolC ~ g[DW]^{"-1"} ~ hr^{"-1"}))) +
+  labs(color = "Season",
+       x = "Age (d)") + 
+  scale_color_manual(values = c("blue", "black"), labels = c("Spring", "Summer")) +
+  theme(panel.background = element_rect(fill = "white", color = "black", size = 1.5),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        plot.margin = margin(1,1,1,1, "cm"),
+        strip.background = element_rect(fill = "white", color = "black"),
+        legend.key = element_rect(fill = "white"),
+        legend.text = element_text(size = 20),
+        legend.title = element_text(size = 20),
+        axis.text = element_text(size = 20, color = "black"),
+        axis.title = element_text(size = 25),
+        text = element_text(family = "Times"))
+
+
+
+
+
+```
+
+
+# DOC Production vs Bulk C:N and Chl:C
+
+```{r}
+
+DOC_CN_Chl_C <- MP_DOC_NPP_phys_env_sum %>% 
+  filter(flag != 2, season %in% c("Spring", "Summer")) %>% 
+  select(age_d, season, DOC_umolC_g_hr, C_N, Chl_C, chlA_nmol_g)
+
+DOC_CN_Chl_C %>% 
+  ggplot(aes(x = C_N, y = DOC_umolC_g_hr)) +
+  geom_point(aes(color = season))
+
+DOC_tissueCN_lm <- lmodel2(DOC_umolC_g_hr ~ C_N, data = DOC_CN_Chl_C)
+
+DOC_tissueCN_lm
+
+
+  
+```
+
+
+# Mature DOC Production: Dark vs. Light Saturating
+
+```{r}
+
+Mature_DOC <- MP_DOC_NPP_phys_env_sum %>% 
+  filter(flag != 2,
+         season %in% c("Spring", "Summer"),
+         age_d < 50) %>% 
+  select(PAR, DOC_umolC_g_hr) %>% 
+  mutate(light_level = case_when(
+    PAR == 0 ~ "Dark",
+    PAR > 300 ~ "Saturating",
+    PAR > 0 & PAR < 300 ~ "Limiting"
+  ))
+
+
+Mature_DOC %>% 
+  ggplot(aes(x = light_level, y = DOC_umolC_g_hr)) +
+  geom_boxplot() +
+  theme_bw()
+           
+light_level_doc.aov <- aov(DOC_umolC_g_hr ~ light_level , data = Mature_DOC)
+
+summary(light_level_doc.aov)
+
+TukeyHSD(light_level_doc.aov)
+
+plot(light_level_doc.aov, 1)
+
+library(car)
+
+leveneTest(DOC_umolC_g_hr ~ light_level, data = Mature_DOC) # no evidence to suggest that variances are signifciantly differnce between groups 
+
+
+plot(light_level_doc.aov, 2)
+
+aov_residuals <- residuals(object = light_level_doc.aov )
+
+shapiro.test(x = aov_residuals) # Not normal, use Kruskal-Wallis
+
+kruskal.test(DOC_umolC_g_hr ~ light_level, data = Mature_DOC)
+
+
+```
+
+
+# PER vs. CN
+
+```{r}
+
+PER_C_N <-  MP_DOC_NPP_phys_env_sum %>% 
+  filter(flag != 2, season %in% c("Spring", "Summer")) %>% 
+  select(age_d, season, PAR,DOC_umolC_g_hr,NPP_umolC_g_hr, C_N, Chl_C, chlA_nmol_g) %>% 
+  filter(PAR > 0) %>% 
+  filter(age_d < 50) %>% 
+  mutate(PER = DOC_umolC_g_hr/NPP_umolC_g_hr *100) %>% 
+  filter(NPP_umolC_g_hr > 0) %>% 
+  ggplot(aes(x = C_N, y = PER)) +
+  geom_point() +
+  labs(y = "Percent Extracellular Release",
+       x = "Tissue C:N") + 
+  theme(panel.background = element_rect(fill = "white", color = "black", size = 1.5),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        plot.margin = margin(1,1,1,1, "cm"),
+        strip.background = element_rect(fill = "white", color = "black"),
+        legend.key = element_rect(fill = "white"),
+        legend.text = element_text(size = 20),
+        legend.title = element_text(size = 20),
+        axis.text = element_text(size = 20, color = "black"),
+        axis.title = element_text(size = 25),
+        text = element_text(family = "Times"))
+
+
+lm_PER_CN <- lmodel2(PER ~ C_N, data = PER_CN)
+
+lm_PER_CN
+
+PER_CN10 <- 10*-0.0468 + 3.4496
+PER_CN40 <- 40*-0.0468 + 3.4496
+
+```
+
+# PER vs. PAR
+
+```{r}
+
+PER_PAR <-  MP_DOC_NPP_phys_env_sum %>% 
+  filter(flag != 2, season %in% c("Spring", "Summer")) %>% 
+  select(age_d, season, PAR,DOC_umolC_g_hr,NPP_umolC_g_hr, C_N, Chl_C, chlA_nmol_g) %>% 
+  filter(PAR > 0) %>% 
+  filter(age_d < 50) %>% 
+  mutate(PER = DOC_umolC_g_hr/NPP_umolC_g_hr *100) %>% 
+  filter(NPP_umolC_g_hr > 0) %>% 
+  ggplot(aes(x = PAR, y = PER)) +
+  geom_point() +
+  labs(y = "Percent Extracellular Release",
+       x = expression(paste("PAR (µmol ",m^-2, s^-1,")"))) + 
+  theme(panel.background = element_rect(fill = "white", color = "black", size = 1.5),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        plot.margin = margin(1,1,1,1, "cm"),
+        strip.background = element_rect(fill = "white", color = "black"),
+        legend.key = element_rect(fill = "white"),
+        legend.text = element_text(size = 20),
+        legend.title = element_text(size = 20),
+        axis.text = element_text(size = 20, color = "black"),
+        axis.title = element_text(size = 25),
+        text = element_text(family = "Times"))
+
+PER_PAR <-  MP_DOC_NPP_phys_env_sum %>% 
+  filter(flag != 2, season %in% c("Spring", "Summer")) %>% 
+  select(age_d, season, PAR,DOC_umolC_g_hr,NPP_umolC_g_hr, C_N, Chl_C, chlA_nmol_g) %>% 
+  filter(PAR > 0) %>% 
+  filter(age_d < 50) %>% 
+  mutate(PER = DOC_umolC_g_hr/NPP_umolC_g_hr *100) %>% 
+  filter(NPP_umolC_g_hr > 0) 
+
+lm_PER_PAR <- lm(PER ~ PAR, data = PER_PAR)
+
+summary(lm_PER_PAR)
+
+
+
+PER_CN10 <- 10*-0.0468 + 3.4496
+PER_CN40 <- 40*-0.0468 + 3.4496
+
+```
+
+# Stats: Mature DOC release, & Summary Stats for Mature PER
+
+
+
+```{r}
+
+# Filter DOC Release Mature 
+
+MP_DOC_NPP_phys_env_sum_mature <- MP_DOC_NPP_phys_env_sum %>% 
+  filter(season %in% c("Spring", "Summer")) %>% 
+  filter(age_d <= 50, flag!= 2)
+
+
+# Mature DOC Release: Spring 
+
+MP_DOC_mature_Spring <- MP_DOC_NPP_phys_env_sum_mature %>% 
+  filter(season == "Spring")
+
+# Mature DOC Release: Summer
+
+MP_DOC_mature_Summer <- MP_DOC_NPP_phys_env_sum_mature %>% 
+  filter(season == "Summer") 
+
+
+
+mature_DOC_NPP_model2 <- lmodel2(DOC_umolC_g_hr~NPP_umolC_g_hr, data = MP_DOC_NPP_phys_env_sum_mature)
+
+mature_DOC_NPP_model2
+
+
+Spring_mature_DOC_NPP_model2 <- lmodel2(DOC_umolC_g_hr~NPP_umolC_g_hr, data = MP_DOC_mature_Spring)
+
+Summer_mature_DOC_NPP_model2 <- lmodel2(DOC_umolC_g_hr~NPP_umolC_g_hr, data = MP_DOC_mature_Summer)
+
+Spring_mature_DOC_NPP_model2
+
+Summer_mature_DOC_NPP_model2
+
+# Summary Stats: Avg PER when PAR > 0
+
+MP_DOC_NPP_phys_env_sum_mature %>% 
+  filter(season != "NA") %>% 
+  filter(lightlevel_timepoint != 1) %>% 
+  group_by(season) %>% 
+  summarize(mean_PER = mean(DOC_umolC_g_hr/NPP_umolC_g_hr),
+            sd_PER = sd(DOC_umolC_g_hr/NPP_umolC_g_hr),
+            max_per = max(DOC_umolC_g_hr/NPP_umolC_g_hr),
+            min_per = min(DOC_umolC_g_hr/NPP_umolC_g_hr)) %>% 
+  ungroup()
+
+
+MP_PER_phys_state <- MP_DOC_NPP_phys_env_sum %>% 
+  mutate(phys_state = case_when(
+    age_d > 50 ~ "Senescent",
+    age_d < 50 ~ "Mature"
+  )) %>% 
+  filter(season != "NA") %>% 
+  filter(lightlevel_timepoint != 1) %>% 
+  filter(NPP_umolC_g_hr > 10) %>% 
+  group_by(phys_state) %>% 
+  summarize(mean_PER = mean(DOC_umolC_g_hr/NPP_umolC_g_hr)*100,
+            sd_PER = sd(DOC_umolC_g_hr/NPP_umolC_g_hr)*100,
+            max_per = max(DOC_umolC_g_hr/NPP_umolC_g_hr)*100,
+            min_per = min(DOC_umolC_g_hr/NPP_umolC_g_hr)*100) %>% 
+  ungroup()
+
+
+MP_DOC_NPP_phys_env_sum_mature %>%
+  filter(lightlevel_timepoint != 1) %>% 
+  summarize(mean_PER = mean(DOC_umolC_g_hr/NPP_umolC_g_hr),
+            sd_PER = sd(DOC_umolC_g_hr/NPP_umolC_g_hr),
+            max_per = max(DOC_umolC_g_hr/NPP_umolC_g_hr),
+            min_per = min(DOC_umolC_g_hr/NPP_umolC_g_hr)) %>% 
+  ungroup()
+
+# test for significant differences in DOC release in MAture kelp between Summer and Spring 
+
+
+MP_DOC_NPP_PER <- MP_DOC_NPP_phys_env_sum_mature %>% 
+  filter(lightlevel_timepoint != 1) %>% 
+  filter(season %in% c("Summer", "Spring")) %>% 
+  mutate(PER = (DOC_umolC_g_hr / NPP_umolC_g_hr)*100) %>% 
+  select(season, PER)
+
+
+# Boxplot PER Summer Spring Mature 
+
+ggboxplot(MP_DOC_NPP_PER, x = "season", y = "PER", 
+          color = "season", palette = c("#00AFBB", "#E7B800"),
+          ylab = "PER", xlab = "season")
+
+ggplot(MP_DOC_NPP_PER, aes(x = PER, fill = season, colour = season)) + 
+  geom_histogram(alpha = 0.5, position = "identity")
+
+## Test for Normality
+
+
+with(MP_DOC_NPP_PER, shapiro.test(PER[season == "Summer"])) # p = 0.00014 = not normal
+
+with(MP_DOC_NPP_PER, shapiro.test(PER[season == "Spring"])) # p = 0.01039 = not normal
+
+# Not normal using Wilcox 
+
+
+season_PER.wilcox <- wilcox.test(PER ~ season, 
+                                 data = MP_DOC_NPP_PER)
+
+
+season_PER.wilcox # p = 0.039 but difference in means only 0.4% 
+
+# Fold change between DOC release in the dark and at saturating irradiances 
+
+
+avg_DOC_rates_phys_state_light_Dark <- MP_DOC_NPP_phys_env_sum %>% 
+  filter(flag != 2 & season %in% c("Spring", "Summer")) %>% 
+  mutate(phys_state = case_when(
+    age_d >= 50 ~ "Senescenct",
+    age_d < 50 ~ "Mature")) %>% 
+  filter(lightlevel_timepoint %in% c(1,5,6)) %>% 
+  mutate(light_level = case_when(lightlevel_timepoint == 1 ~ "Dark",
+                   lightlevel_timepoint %in% c(5,6) ~ "Saturating")) %>% 
+  group_by(light_level) %>% 
+  summarize(mean_DOC = round(mean(DOC_umolC_g_hr),1),
+            sd_DOC = round(sd(DOC_umolC_g_hr),1),
+            min_PAR = min(PAR),
+            max_PAR = max(PAR))
+
+write_excel_csv(avg_DOC_rates_phys_state_light_Dark, "/Users/chanceenglish/Desktop/Lab Shiz/ARPA-e/Giant_Kelp_DOC/Data/avg_DOC_rates_phys_state_light_Dark.csv")
+
+
+```
+
+# Mature DOC Release vs PAR 
+
+```{r}
+
+
+# DOC Production vs. Light 
+
+mature_DOC_PAR_model1 <- lm(DOC_umolC_g_hr~PAR, data = MP_DOC_NPP_phys_env_sum_mature)
+
+summary(mature_DOC_PAR_model1)
+
+doc_PAR_mature <- MP_DOC_NPP_phys_env_sum_mature %>% 
+  filter(season %in% c("Summer", "Spring")) %>% 
+  ggplot(aes(x = PAR, y = DOC_umolC_g_hr)) +
+  geom_point(size = 7) +
+  ylab(expression(DOC~Production~(µmolC ~ g[DW]^{"-1"} ~ hr^{"-1"}))) +
+  xlab(expression(paste("PAR (µmol ",m^-2, s^-1,")"))) +
+  labs(color = "PAR") + 
+  scale_y_continuous(labels = label_number(accuracy = 1), limits = c(0,10), breaks = c(0,5,10,15,20)) +
+  geom_abline(slope = 0.0028, intercept = 2.28, size = 2) +
+  theme(panel.background = element_rect(fill = "white", color = "black", size = 1.5),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        plot.margin = margin(1,1,1,1, "cm"),
+        strip.background = element_rect(fill = "white", color = "black"),
+        legend.key = element_rect(fill = "white"),
+        legend.text = element_text(size = 20),
+        legend.key.height = unit(0.5, "inch"),
+        legend.key.width = unit(0.4, "inch"),
+        legend.title = element_text(size = 24),
+        axis.text = element_text(size = 30, color = "black"),
+        axis.title = element_text(size = 25),
+        text = element_text(family = "Times"))
+
+
+
+
+
+
+
+```
+
+# Senescent DOC Release vs PAR
+
+```{r}
+
+MP_DOC_NPP_phys_env_sum_senescent <- MP_DOC_NPP_phys_env_sum_flags %>%
+  filter(age_d > 50)
+  
+MP_DOC_NPP_phys_env_sum_senescent %>% 
+  ggplot(aes(x = PAR, y = DOC_umolC_g_hr)) +
+  geom_point()
+
+lm_DOC_senescence <- lm(DOC_umolC_g_hr ~ PAR, data = MP_DOC_NPP_phys_env_sum_senescent)
+
+summary(lm_DOC_senescence)
+
+MP_DOC_NPP_phys_env_sum_senescent %>% 
+  group_by(PAR) %>% 
+  summarize(mean_DOC = mean(DOC_umolC_g_hr),
+            sd_DOC = sd(DOC_umolC_g_hr))
+
+MP_DOC_NPP_phys_env_sum_senescent <- MP_DOC_NPP_phys_env_sum_flags %>%
+  filter(age_d > 50)
+  
+MP_DOC_NPP_phys_env_sum_senescent %>% 
+  ggplot(aes(x = PAR, y = DOC_umolC_g_hr)) +
+  geom_point()
+
+lm_DOC_senescence <- lm(DOC_umolC_g_hr ~ PAR, data = MP_DOC_NPP_phys_env_sum_senescent)
+
+summary(lm_DOC_senescence)
+
+MP_DOC_NPP_phys_env_sum_senescent %>% 
+  group_by(PAR) %>% 
+  summarize(mean_DOC = mean(DOC_umolC_g_hr),
+            sd_DOC = sd(DOC_umolC_g_hr))
+
+```
+
+
+
+# Physiological Changes
+
+
+```{r}
+
+Chl_C_age_summer <- MP_DOC_NPP_phys_env_sum %>% 
+  filter(season == "Summer") %>% 
+  group_by(age_d) %>% 
+  filter(Chl_C != "NA", 
+         lightlevel_timepoint %in% c(1,2)) %>% 
+  summarise(Chl_C_avg = mean(Chl_C), 
+            sd_Chl_C = sd(Chl_C),
+            season = season) %>% 
+  ungroup() 
+
+
+
+
+Chl_C_age_spring <- MP_DOC_NPP_phys_env_sum %>% 
+  filter(season == "Spring") %>% 
+  group_by(age_d) %>% 
+  filter(Chl_C != "NA", 
+         lightlevel_timepoint %in% c(1,2)) %>% 
+  summarise(Chl_C_avg = mean(Chl_C), 
+            sd_Chl_C = sd(Chl_C),
+            season = season) %>% 
+  ungroup() 
+
+
+
+ Chl_C_age <- MP_DOC_NPP_phys_env_sum %>% 
+  group_by(age_d) %>% 
+  filter(Chl_C != "NA", 
+         lightlevel_timepoint %in% c(1,2)) %>% 
+  summarise(Chl_C_avg = mean(Chl_C), 
+            sd_Chl_C = sd(Chl_C)) %>% 
+  ungroup() %>% 
+  ggplot(aes(x = age_d, 
+             y = Chl_C_avg*1000)) +
+  geom_point(size = 6) +
+  geom_sigmoid(aes(y = Chl_C_avg[age_d==min(age_d)]*1000, 
+                   yend = Chl_C_avg[age_d==max(age_d)]*1000, 
+                   x = min(age_d), 
+                   xend =max(age_d)), size = 1) +
+  ylab(expression(Chl:C~(mg^{"1"} ~ g^{"-1"}))) +
+  labs(x = "Age (d)") + 
+  scale_y_continuous(labels = label_number(accuracy = 1), 
+                     breaks = c(0,2,4,6,8,10), limits = c(0,10)) +
+  geom_errorbar(aes(x = age_d, 
+                    y = Chl_C_avg*1000, 
+                    ymin =  Chl_C_avg*1000 - sd_Chl_C*1000, 
+                    ymax = Chl_C_avg*1000 + sd_Chl_C*1000), 
+                width = 0) +
+  theme(panel.background = element_rect(fill = "white", 
+                                        color = "black", 
+                                        size = 1.5),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        plot.margin = margin(1,1,1,1, "cm"),
+        strip.background = element_rect(fill = "white", 
+                                        color = "black"),
+        legend.key = element_rect(fill = "white"),
+        legend.text = element_text(size = 20),
+        legend.title = element_text(size = 20),
+        axis.text = element_text(size = 30, 
+                                 color = "black"),
+        axis.title = element_text(size = 30),
+        text = element_text(family = "Times"))
+
+ 
+ 
+  
+Chl_C_age_cohorts <- ggplot() +
+  geom_point(aes(x = Chl_C_age_summer$age_d, 
+             y = Chl_C_age_summer$Chl_C_avg*1000), 
+             shape = 17, 
+             size = 5) +
+  geom_point(aes(x = Chl_C_age_spring$age_d, 
+             y = Chl_C_age_spring$Chl_C_avg*1000),
+             shape = 19, 
+             size = 5) +
+  geom_errorbar(aes(x = Chl_C_age_spring$age_d, 
+                    y = Chl_C_age_spring$Chl_C_avg*1000, 
+                    ymin =  Chl_C_age_spring$Chl_C_avg*1000 - Chl_C_age_spring$sd_Chl_C*1000, 
+                    ymax = Chl_C_age_spring$Chl_C_avg*1000 + Chl_C_age_spring$sd_Chl_C*1000), 
+                width = 0) +
+  geom_sigmoid(aes(y = Chl_C_age_summer$Chl_C_avg[Chl_C_age_summer$age_d==min(Chl_C_age_summer$age_d)]*1000, 
+                   yend = Chl_C_age_summer$Chl_C_avg[Chl_C_age_summer$age_d==max(Chl_C_age_summer$age_d)]*1000, 
+                   x = min(Chl_C_age_summer$age_d), 
+                   xend = 100), 
+               size = 1) +
+  ylab(expression(Chl:C~(mg^{"1"} ~ g^{"-1"}))) +
+  labs(x = "Age (d)") + 
+  geom_errorbar(aes(x = Chl_C_age_summer$age_d, 
+                    y = Chl_C_age_summer$Chl_C_avg*1000, 
+                    ymin =  Chl_C_age_summer$Chl_C_avg*1000 - Chl_C_age_summer$sd_Chl_C*1000, 
+                    ymax = Chl_C_age_summer$Chl_C_avg*1000 + Chl_C_age_summer$sd_Chl_C*1000), 
+                width = 0) +
+  geom_sigmoid(aes(y = Chl_C_age_spring$Chl_C_avg[Chl_C_age_spring$age_d==min(Chl_C_age_spring$age_d)]*1000, 
+                   yend = Chl_C_age_summer$Chl_C_avg[Chl_C_age_summer$age_d==max(Chl_C_age_summer$age_d)]*1000, 
+                   x = min(Chl_C_age_spring$age_d), 
+                   xend = 100), size = 1, shape = 16) +
+  geom_vline(xintercept = 50, linetype = "dashed", size = 0.5) +
+  ylab(expression(Chl:C~(mg^{"1"} ~ g^{"-1"}))) +
+  labs(x = "Age (d)") + 
+  scale_y_continuous(labels = label_number(accuracy = 1), 
+                     breaks = c(0,5,10,15,20), 
+                     limits = c(0,20)) +
+  scale_shape_manual(labels = c("Spring", "Summer"), values = c(19,17), guide = ) +
+  labs(color = "",
+       shape = "Season") +
+  coord_cartesian(expand = c(0,0)) +
+  scale_x_continuous(breaks = c(25,50,75,100), limits = c(10,100)) +
+  theme(panel.background = element_rect(fill = "white", 
+                                        color = "black", 
+                                        size = 1.5),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        plot.margin = margin(1,1,1,1, "cm"),
+        strip.background = element_rect(fill = "white", 
+                                        color = "black"),
+        legend.key = element_rect(fill = "white"),
+        legend.text = element_text(size = 20),
+        legend.title = element_text(size = 20),
+        legend.position = c(0.8,0.8),
+        axis.text = element_text(size = 30, 
+                                 color = "black"),
+        axis.title = element_text(size = 30),
+        text = element_text(family = "Times")) +
+   annotate("rect", xmin = 10, xmax = 50, ymin = 0, ymax = 20,
+           alpha = .25,fill = "#266A25")  +
+  annotate("rect", xmin = 50.1, xmax = 100, ymin = 0, ymax = 20,
+           alpha = .25,fill = "#BD9C3D") 
+
+  
+
+
+
+
+```
+
+
+# Tissue Nitrogen Both Cohorts
+
+
+```{r}
+
+# Tissue Nitrogen
+
+tissue_N_age_both_seasons <- MP_DOC_NPP_phys_env_sum %>% 
+  group_by(age_d, season) %>% 
+  filter(chlA_g_g != "NA", 
+         lightlevel_timepoint %in% c(1,2),
+         reef == "MK",
+         season %in% c("Summer", "Spring")) %>% 
+ summarise(N_avg = mean(tissue_N_percent), 
+            sd_N = sd(tissue_N_percent)) %>%  
+  ungroup() %>% 
+  ggplot(aes(x = age_d, 
+             y = N_avg,
+             color = season)) +
+  geom_point(size = 6) +
+  geom_line(aes(color = season), size = 1) +
+  labs(x = "Age (d)",
+       y = "Tissue Nitrogen (% Dry Weight)") + 
+  scale_color_manual(values = c("red", "black")) +
+  scale_y_log10() +
+  geom_errorbar(aes(x = age_d, 
+                    y = N_avg, 
+                    ymin =  N_avg - sd_N, 
+                    ymax = N_avg + sd_N),
+                width = 0) +
+  theme(panel.background = element_rect(fill = "white", 
+                                        color = "black", 
+                                        size = 1.5),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        plot.margin = margin(1,1,1,1, "cm"),
+        strip.background = element_rect(fill = "white", 
+                                        color = "black"),
+        legend.key = element_rect(fill = "white"),
+        legend.text = element_text(size = 20),
+        legend.title = element_blank(),
+        axis.text = element_text(size = 30, 
+                                 color = "black"),
+        axis.title = element_text(size = 30),
+        text = element_text(family = "Times"))
+
+  
+
+
+
+
+```
+
+
+
+# Stats: Differnces in Chl:C and Tissue C:N between cohorts and physiological status (mature vs. senescent)
+
+```{r}
+
+MP_chlC_sum <- MP_DOC_NPP_phys_env_sum %>% 
+  group_by(age_d, season) %>% 
+  filter(chlA_g_g != "NA", 
+         lightlevel_timepoint %in% c(1,2),
+         reef == "MK",
+         season %in% c("Summer", "Spring")) %>% 
+  select(blade, age_d, season, Chl_C, C_N, tissue_N_percent, chlA_nmol_g) %>% 
+  mutate(physio_state = case_when(
+    age_d <= 50 ~ "Mature",
+    age_d >50 ~ "Senescent"
+  ))
+
+# Summarize ChlC and CN of mature and senescent blades from Spring and Summer cohorts
+
+MP_ChlC_CN_summary_statistics <- MP_chlC_sum %>% 
+  group_by(season, physio_state) %>% 
+  summarize(mean_Chl_C = mean(Chl_C)*1000,
+            sd_Chl_C = sd(Chl_C)*1000,
+            mean_CN = mean(C_N),
+            sd_CN = sd(C_N),
+            mean_N = mean(tissue_N_percent),
+            sd_N = sd(tissue_N_percent),
+            mean_Chl = mean(chlA_nmol_g),
+            sd_Chl = sd(chlA_nmol_g))
+
+# Two Way ANOVA: Chl:C vs Season * Physiological State
+
+ggboxplot(MP_chlC_sum, x = "season", y = "Chl_C", color = "physio_state",
+          palette = c("#00AFBB", "#E7B800"))
+
+
+ChlC_physiostate_season.aov2 <- aov(Chl_C ~ season + physio_state, data = MP_chlC_sum)
+
+
+
+summary(ChlC_physiostate_season.aov2)
+
+
+# Two Way Interaction between Season and Physiostate
+
+ChlC_physiostate_season.aov3 <- aov(Chl_C ~  season + physio_state, data = MP_chlC_sum)
+
+
+summary(ChlC_physiostate_season.aov3) # No significant interaction 
+
+# Pairwise TUKEY HSD Test
+
+TukeyHSD(ChlC_physiostate_season.aov3)
+
+pairWise_comparison_ChlC_season_physio_state # Significant difference in Chl:C between mature kelp between seasons and between mature and senescent kelp within seasons.
+
+
+
+CN_physiostate_season.aov3 <- aov(C_N ~  season + physio_state, data = MP_chlC_sum)
+
+CN_physiostate_season.aov3
+
+pairwise_comparison_CN_season_physio_state <- TukeyHSD(CN_physiostate_season.aov3)
+
+pairwise_comparison_CN_season_physio_state
+
+# Measure percent N between phys state and season 
+
+tissueN_physiostate_season.aov3 <- aov(tissue_N_percent ~  season * physio_state, data = MP_chlC_sum)
+
+summary(tissueN_physiostate_season.aov3)
+
+pairwise_comparison_tissueNpercent_season_physio_state <- TukeyHSD(tissueN_physiostate_season.aov3)
+
+pairwise_comparison_tissueNpercent_season_physio_state
+
+
+# Two Sample t-test: C:N content of mature kelp in Spring vs. Summer
+
+
+## Test for Normality
+
+mature_CN <- MP_chlC_sum %>% 
+  filter(physio_state == "Mature") 
+
+with(mature_CN, shapiro.test(C_N[season == "Summer"])) # p = 0.2471 = normal
+
+with(mature_CN, shapiro.test(C_N[season == "Spring"])) # p = 0.7502 = normal
+
+## Equal Variances 
+
+matureCN.ftest <- var.test(C_N ~ season, data = mature_CN)
+
+matureCN.ftest # Variances are not equal. Use Welch's t-test 
+
+
+summer_mature_CN <- mature_CN %>% 
+  filter(season == "Summer") 
+
+summer_mature_CN_vector <- summer_mature_CN$C_N
+
+spring_mature_CN <- mature_CN%>% 
+  filter(season == "Spring") 
+
+spring_mature_CN_vector <- spring_mature_CN$C_N
+
+
+mature_seasonal_CN_t.test <- t.test(C_N ~ season, data = mature_CN, var.equal = FALSE, alternative = "less")
+
+mature_seasonal_CN_t.test # Spring time CN is significantly lower than Summer time CN for mature kelp
+
+
+.chl_tissueN_lm <- lm(data = MP_chlC_sum, chlA_nmol_g ~ tissue_N_percent)
+
+summary(chl_tissueN_lm)
+
+MP_chlC_sum %>% 
+  ggplot(aes(x = tissue_N_percent, y = chlA_nmol_g)) +
+  geom_point()
+
+
+
+# Two Sample t-test: C:N content of mature kelp in Spring vs. Summer
+
+
+## Test for Normality
+
+mature_ChlC <- MP_chlC_sum %>% 
+  filter(physio_state == "Mature") 
+
+with(mature_ChlC, shapiro.test(Chl_C[season == "Summer"])) # p = 0.0.003 = not normal
+
+with(mature_ChlC, shapiro.test(Chl_C[season == "Spring"])) # p = 0.266 = normal
+
+## Equal Variances 
+
+matureChlC.ftest <- var.test(Chl_C ~ season, data = mature_ChlC)
+
+matureChlC.ftest # Variances are not equal. Use Welch's t-test 
+
+
+
+
+mature_seasonal_ChlC_wilcox_test <- wilcox.test(Chl_C ~ season, data = mature_ChlC, exact = FALSE)
+
+mature_seasonal_ChlC_wilcox_test # Spring time CN is significantly lower than Summer time CN for mature kelp
+
+
+
+
+```
+
+# Boxplots: Tissue Nitrogen between season and physiological state 
+
+```{r}
+
+season_phys_state_boxplot <- MP_chlC_sum %>% 
+  ggplot() +
+  geom_boxplot(aes(x = season, y = tissue_N_percent, fill = physio_state)) +
+  geom_point(aes(x = season, y = tissue_N_percent, color = physio_state),
+             position = position_jitterdodge()) +
+  labs(y = "Tissue Nitrogen (% DW)",
+       x = "") +
+  scale_fill_manual(values = c("#266A25","#BD9C3D")) +
+  scale_color_manual(values = c("darkgreen","darkgoldenrod")) +
+  theme(panel.background = element_rect(fill = "white", 
+                                        color = "black", 
+                                        size = 1.5),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        plot.margin = margin(1,1,1,1, "cm"),
+        strip.background = element_rect(fill = "white", 
+                                        color = "black"),
+        legend.key = element_rect(fill = "white"),
+        legend.text = element_text(size = 15),
+        legend.title = element_blank(),
+        legend.position = c(0.72,0.75),
+        axis.text = element_text(size = 30, 
+                                 color = "black"),
+        axis.title = element_text(size = 30),
+        text = element_text(family = "Times"))
+
+  
+
+
+
+
+```
+
+
+
+# Stats: Linear Regression between Chl:C and Tissue CN
+
+
+```{r}
+
+
+MP_chlC_sum %>% 
+  ggplot(aes(x = C_N, y = Chl_C)) +
+  geom_point(size = 5,aes(color = season)) +
+  geom_smooth(method = "lm", aes(color = season)) +
+  theme(panel.background = element_rect(fill = "white", 
+                                        color = "black", 
+                                        size = 1.5),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        plot.margin = margin(1,1,1,1, "cm"),
+        strip.background = element_rect(fill = "white", 
+                                        color = "black"),
+        legend.key = element_rect(fill = "white"),
+        legend.text = element_text(size = 20),
+        legend.title = element_blank(),
+        axis.text = element_text(size = 30, 
+                                 color = "black"),
+        axis.title = element_text(size = 30),
+        text = element_text(family = "Times"))
+
+# Multiple Linear Effects Model: Chl ~ CN + Season
+
+mle_lm_ChlC_CN_season <- lm(Chl_C ~ C_N + season, data = MP_chlC_sum)
+
+summary(mle_lm_ChlC_CN_season)
+
+# Linear Model 
+lm_ChlC_CN <-  lm(Chl_C ~ C_N, data = MP_chlC_sum)
+
+summary(lm_ChlC_CN)
+
+AIC(mle_lm_ChlC_CN_season, lm_ChlC_CN)
+
+
+```
+
+
+# NPP 
+
+
+```{r}
+
+
+NPP_data <- read_xlsx("MP_NPP_summary.xlsx", sheet = 2)
+
+NPP_PAR <- NPP_data %>% 
+  group_by(age_d) %>% 
+  ggplot(aes(x = PAR, y = modeled_NPP, color = age_d, group = age_d)) +
+  geom_path(size = 4, orientation = "y") +
+  xlab(expression(PAR~(µmol ~ m^{"-2"} ~ s^{"-1"}))) +
+  ylab(expression(NPP~(µmolC ~ g[DW]^{"-1"} ~ hr^{"-1"}))) +
+  labs(color = "Age (d)") + 
+  scale_y_continuous(labels = label_number(accuracy = 1)) +
+  scale_color_viridis_b(breaks = c(0,15,30,45,60,75,90), limits = c(0,90)) +
+  theme(panel.background = element_rect(fill = "white", color = "black", size = 1.5),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        plot.margin = margin(1,1,1,1, "cm"),
+        strip.background = element_rect(fill = "white", color = "black"),
+        legend.key = element_rect(fill = "white"),
+        legend.text = element_text(size = 20),
+        legend.title = element_text(size = 20),
+        axis.text = element_text(size = 20, color = "black"),
+        axis.title = element_text(size = 25),
+        text = element_text(family = "Times"))
+
+
+
+
+
+
+```
+
+
+# NPP MLR w/ Light and Chl:C
+
+
+```{r}
+
+
+MP_DOC_NPP_phys_env_sum_noflags  <- MP_DOC_NPP_phys_env_sum %>% 
+  filter(flag != 2)
+
+
+MP_DOC_NPP_phys_env_sum_noflags %>% 
+  ggplot(aes(x = Chl_C, y = NPP_umolC_g_hr)) +
+  geom_point(aes(color = PAR), size = 7) +
+  ylab(expression(NPP~(µmolC ~ g[DW]^{"-1"} ~ hr^{"-1"}))) +
+  xlab(expression(Chl:C~(g^{"1"} ~ g^{"-1"}))) +
+  labs(color = "PAR") + 
+  scale_y_continuous() +
+  scale_x_continuous(labels = label_number(accuracy = 0.001), breaks = c(0, 0.004, 0.008, 00.012)) +
+  scale_color_viridis_b(breaks = c(seq(0,1500,250)), limits = c(0,1500)) +
+  theme(panel.background = element_rect(fill = "white", color = "black", size = 1.5),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        plot.margin = margin(1,1,1,1, "cm"),
+        strip.background = element_rect(fill = "white", color = "black"),
+        legend.key = element_rect(fill = "white"),
+        legend.text = element_text(size = 20),
+        legend.title = element_text(size = 20),
+        axis.text = element_text(size = 20, color = "black"),
+        axis.title = element_text(size = 25),
+        text = element_text(family = "Times"))
+
+
+
+
+
+mlr_NPP_PAR_ChlC <- lm(mean_NPP ~ mean_PAR + mean_Chl_C, data = MP_DOC_NPP_phys_env_sum_noflags)
+
+
+
+summary(mlr_NPP_PAR_ChlC)
+
+plot(mlr_NPP_PAR_ChlC)
+
+mlr_NPP_PAR_ChlC
+
+
+```
+
+
+
+# Generalized Additive Model of NPP ~ Chl:C and PAR
+
+
+
+```{r}
+
+
+gam_NPP_PAR_age_d <- gam(NPP_umolC_g_hr ~ s(age_d) + s(PAR, k = 1),data = MP_DOC_NPP_phys_env_sum_noflags)
+
+
+
+summary(gam_NPP_PAR_age_d)
+
+
+plot(gam_NPP_PAR_age_d, pch = 1, cex = 1, residuals = T, pages = 1, ylab = "Additive Effect on NPP")
+
+gam.check(gam_NPP_PAR_ChlC)
+
+
+# Extract fitted values and measured to visualize model fit 
+
+gam_x <- gam_NPP_PAR_ChlC$fitted.values
+gam_y <- gam_NPP_PAR_ChlC$y
+
+gam_model_fit_df <- data_frame(gam_x,gam_y)
+
+gam_fit_model <- gam_model_fit_df %>% 
+  ggplot(aes(gam_NPP_PAR_ChlC$fitted.values, gam_NPP_PAR_ChlC$y)) + 
+  geom_point() +
+  geom_abline(slope = 1.02, intercept = -1.5) +
+  geom_abline(color = "red") +
+  xlab(expression(Fitted~NPP~(µmolC ~ g[DW]^{"-1"} ~ hr^{"-1"}))) +
+  ylab(expression(Measured~NPP~(µmolC ~ g[DW]^{"-1"} ~ hr^{"-1"}))) +
+  scale_y_continuous(limits = c(-50,250), breaks = c(-50,0,50,100,150,200,250)) +
+  scale_x_continuous(limits = c(-50,250), breaks = c(-50,0,50,100,150,200,250)) +
+   theme(panel.background = element_rect(fill = "white", color = "black", size = 1.5),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        plot.margin = margin(1,1,1,1, "cm"),
+        strip.background = element_rect(fill = "white", color = "black"),
+        legend.key = element_rect(fill = "white"),
+        legend.text = element_text(size = 20),
+        legend.title = element_text(size = 20),
+        axis.text = element_text(size = 20, color = "black"),
+        axis.title = element_text(size = 25),
+        text = element_text(family = "Times"))
+
+gam_NPP_fit_regression <- lm(gam_y~gam_x, data = gam_model_fit_df)
+
+summary(gam_NPP_fit_regression)
+
+
+AIC(gam_NPP_PAR_ChlC_1, gam_NPP_PAR_ChlC_2)
+```
+
+# GAM FOR DOC PRODUCTION
+
+# Generalized Additive Model of DOC ~ Chl:C and PAR
+
+```{r}
+
+gam_DOC_PAR_ChlC <- gam(DOC_umolC_g_hr ~ s(Chl_C, k = 2) + s(PAR) ,data = MP_DOC_NPP_phys_env_sum_noflags)
+
+summary(gam_DOC_PAR_ChlC)
+
+
+plot(gam_DOC_PAR_ChlC, pch = 1, cex = 1, residuals = T, pages = 1, ylab = "Additive Effect on DOC")
+
+gam.check(gam_DOC_PAR_ChlC_1)
+
+# Extract fitted values and measured to visualize model fit 
+
+gam_DOC_x <- gam_DOC_PAR_ChlC$fitted.values
+gam_DOC_y <- gam_DOC_PAR_ChlC$y
+
+gam_DOC_model_fit_df <- data_frame(gam_DOC_x,gam_DOC_y)
+
+gam_DOC_fit_model <- gam_DOC_model_fit_df %>% 
+  ggplot(aes(gam_DOC_x, gam_DOC_y)) + 
+  geom_point() +
+  geom_abline(slope = 1.02, intercept = -1.5 ,color = "red") +
+  xlab(expression(Fitted~DOC~(µmolC ~ g[DW]^{"-1"} ~ hr^{"-1"}))) +
+  ylab(expression(Measured~DOC~(µmolC ~ g[DW]^{"-1"} ~ hr^{"-1"}))) +
+  scale_y_continuous(limits = c(0,70), breaks = c(0,10,20,30,40,50,60,70)) +
+  scale_x_continuous(limits = c(0,70), breaks = c(0,10,20,30,40,50,60,70)) +
+   theme(panel.background = element_rect(fill = "white", color = "black", size = 1.5),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        plot.margin = margin(1,1,1,1, "cm"),
+        strip.background = element_rect(fill = "white", color = "black"),
+        legend.key = element_rect(fill = "white"),
+        legend.text = element_text(size = 20),
+        legend.title = element_text(size = 20),
+        axis.text = element_text(size = 20, color = "black"),
+        axis.title = element_text(size = 25),
+        text = element_text(family = "Times"))
+
+gam_DOC_fit_regression <- lm(gam_DOC_y~gam_DOC_x, data = gam_DOC_model_fit_df)
+
+summary(gam_NPP_fit_regression)
+
+
+```
+
+
+
+# DOM Composition 
+
+
+
+```{r}
+
+MP_comp_sum_TCHO <- MP_DOM_Sugar %>% 
+  group_by(age_d) %>% 
+  summarize(HPLC_TCHO = mean(HPLC_sugar_per_doc), sd_HPLC_TCHO = sd(HPLC_sugar_per_doc),
+            TPC = mean(a270_DOC), sd_TPC = sd(a270_DOC),
+            mean_fucose = mean(Fucose),
+            sd_fucose = sd(Fucose),
+            mean_mannuronic = mean(`Man-URA`),
+            sd_mannuronic = sd(`Man-URA`))
+  
+
+TCHO_DOC <- MP_comp_sum_TCHO %>% 
+   ggplot(aes(x = age_d, y = HPLC_TCHO)) +
+  geom_point(size = 5) +
+  geom_errorbar(aes(ymin = HPLC_TCHO - sd_HPLC_TCHO, ymax = HPLC_TCHO + sd_HPLC_TCHO)) %>% 
+  labs(x = "Age (d)",
+       y = "HPLC TCHO (%DOC)") + 
+  scale_y_continuous(labels = label_number(accuracy = 1), limits = c(0,50), breaks = c(0,10,20,30,40,50)) +
+  theme(panel.background = element_rect(fill = "white", color = "black", size = 1.5),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        plot.margin = margin(1,1,1,1, "cm"),
+        strip.background = element_rect(fill = "white", color = "black"),
+        legend.key = element_rect(fill = "white"),
+        legend.text = element_text(size = 20),
+        legend.title = element_text(size = 20),
+        axis.text = element_text(size = 20, color = "black"),
+        axis.title = element_text(size = 25),
+        text = element_text(family = "Times"))
+
+  
+
+TPC_DOC <- MP_comp_sum_TCHO %>% 
+  ggplot(aes(x = age_d, y = TPC*100)) +
+  geom_point(size = 5) +
+  labs(x = "Age (d)",
+       y = "TPC (%DOC)") + 
+  scale_y_continuous(labels = label_number(accuracy = 1), limits = c(0,50), breaks = c(0,10,20,30,40,50)) +
+  theme(panel.background = element_rect(fill = "white", color = "black", size = 1.5),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        plot.margin = margin(1,1,1,1, "cm"),
+        strip.background = element_rect(fill = "white", color = "black"),
+        legend.key = element_rect(fill = "white"),
+        legend.text = element_text(size = 20),
+        legend.title = element_text(size = 20),
+        axis.text = element_text(size = 20, color = "black"),
+        axis.title = element_text(size = 25),
+        text = element_text(family = "Times"))
+
+
+
+
+
+
+
+```
+
+
+
+```{r}
+
+
+percent_CHO <- MP_DOM_character %>% 
+  mutate(age_d = as.character(age_d)) %>% 
+  ggplot(aes(x = age_d, y = HPLC_sugar_per_doc)) +
+  geom_boxplot() +
+  labs(x = "Age (d)",
+       y = "Percent CHO (%)",
+       fill = "") +
+  geom_point( position=position_dodge(width=0.75)) +
+   theme(panel.background = element_rect(fill = "white", color = "black", size = 1.5),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        plot.margin = margin(1,1,1,1, "cm"),
+        strip.background = element_rect(fill = "white", color = "black"),
+        legend.key = element_rect(fill = "white"),
+        legend.text = element_text(size = 20),
+        legend.title = element_text(size = 20),
+        axis.text = element_text(size = 20, color = "black"),
+        axis.title = element_text(size = 25),
+        text = element_text(family = "Times"))
+
+mean_CHO <- MP_DOM_character %>% 
+  summarize(mean(HPLC_sugar_per_doc))
+
+# ANOVA 
+
+
+
+model  <- lm( HPLC_sugar_per_doc ~ age_d, data = MP_DOM_character)
+ggqqplot(residuals(model))
+shapiro_test(residuals(model))
+
+MP_DOM_character %>% 
+  group_by(age_d) %>%
+  identify_outliers(HPLC_sugar_per_doc)
+
+
+ggqqplot(MP_DOM_character, "HPLC_sugar_per_doc", facet.by = "age_d")
+
+MP_DOM_character %>% 
+  group_by(age_d) %>% 
+  shapiro_test(HPLC_sugar_per_doc)
+
+
+# Filter out extreme outlier to compare ANOVA test with and without it 
+
+MP_DOM_character_no_outlier <- MP_DOM_character %>% 
+  filter(blade != 2 | age_d != 16)
+
+# Anova 
+
+res.aov <- MP_DOM_character %>% anova_test(HPLC_sugar_per_doc ~ age_d)
+res.aov
+
+res.aov_no_extreme_outlier <- MP_DOM_character_no_outlier %>% anova_test(HPLC_sugar_per_doc ~ age_d)
+res.aov_no_extreme_outlier
+
+pwc <- MP_DOM_character %>% tukey_hsd(HPLC_sugar_per_doc ~ as.factor(age_d))
+pwc
+
+pwc_no_outlier <- MP_DOM_character_no_outlier %>% tukey_hsd(HPLC_sugar_per_doc ~ as.factor(age_d))
+pwc_no_outlier
+```
+
+
+# Sugar Monomers Composition & PCA
+
+
+```{r}
+
+suga_numeric <- sugars[1:42,7:15]
+
+
+
+```
+
+
+```{r}
+
+
+sug.pca1 <- prcomp(suga_numeric, scale = TRUE)
+
+fviz_eig(sug.pca1)
+
+sug.pca1
+
+summary(sug.pca1)
+
+get_eig(sug.pca1)
+
+eigenvals(sug.pca1)
+
+print(sug.pca1)
+
+
+
+```
+
+
+ # Sugars Biplot for Mature vs. Senescent Kelp Exudates
+
+
+```{r}
+
+library(scico)
+
+fviz_pca_biplot(sug.pca1,
+             col.var = "cos2", # Color by the quality of representation
+             gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),
+             col.ind = "black",
+             repel = TRUE     # Avoid text overlapping
+             )
+
+
+pca_plot <- fviz_pca_biplot(sug.pca1, 
+                level = "var",
+                habillage = sugars[1:42,]$phase, 
+                addEllipses = TRUE, 
+                ellipse.level = 0.95,
+                label = "var", labelsize = 5,
+                col.var = "black",
+                repel = T,
+                geom="point", pointsize = 4,
+                palette = c("#266A25","#BD9C3D")) +
+  labs(title = "", 
+       x = "PC1 (24%)",
+       y = "PC2 (24%)") +
+  scale_y_continuous(labels = label_number(accuracy = 1)) + 
+   theme(panel.background = element_rect(fill = "white", color = "black", size = 1.5),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        plot.margin = margin(1,1,1,1, "cm"),
+        strip.background = element_rect(fill = "white", color = "black"),
+        legend.key = element_rect(fill = "white"),
+        legend.text = element_text(size = 20),
+        legend.position = "none",
+        legend.title = element_blank(),
+        axis.text = element_text(size = 30, color = "black"),
+        axis.title = element_text(size = 30),
+        text = element_text(family = "Times"))
+
+# PCA Plot Season 
+
+pca_plot_season <- fviz_pca_biplot(sug.pca1, 
+                level = "var",
+                habillage = MP_DOM_Sugar[1:42,]$season, 
+                addEllipses = TRUE, 
+                ellipse.level = 0.95,
+                label = "var", labelsize = 5,
+                col.var = "black",
+                repel = T,
+                geom="point", pointsize = 4,
+                palette = c("#022E73", "#9D3709")) +
+  labs(title = "", 
+       x = "PC1 (26%)",
+       y = "PC2 (23%)") +
+  scale_y_continuous(labels = label_number(accuracy = 1)) + 
+   theme(panel.background = element_rect(fill = "white", color = "black", size = 1.5),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        plot.margin = margin(1,1,1,1, "cm"),
+        strip.background = element_rect(fill = "white", color = "black"),
+        legend.key = element_rect(fill = "white"),
+        legend.text = element_text(size = 20),
+        legend.position = c(0.2,0.1),
+        legend.title = element_blank(),
+        axis.text = element_text(size = 30, color = "black"),
+        axis.title = element_text(size = 30),
+        text = element_text(family = "Times"))
+  
+# Compare Mature Kelp for Summer and Spring
+
+fviz_pca_biplot(sug.pca_mature,
+             col.var = "cos2", # Color by the quality of representation
+             gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),
+             col.ind = "black",
+             repel = TRUE     # Avoid text overlapping
+             )
+
+
+pca_plot_mature <- fviz_pca_biplot(sug.pca_mature, 
+                level = "var",
+                habillage = MP_DOM_Sugar_mature[1:12,]$season, 
+                addEllipses = TRUE, 
+                ellipse.level = 0.95,
+                label = "var", labelsize = 5,
+                col.var = "black",
+                repel = T,
+                geom="point", pointsize = 4,
+                palette = c("steelblue1", "firebrick1")) +
+  labs(title = "", 
+       x = "PC1 (26%)",
+       y = "PC2 (23%)") +
+  scale_y_continuous(labels = label_number(accuracy = 1)) + 
+   theme(panel.background = element_rect(fill = "white", color = "black", size = 1.5),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        plot.margin = margin(1,1,1,1, "cm"),
+        strip.background = element_rect(fill = "white", color = "black"),
+        legend.key = element_rect(fill = "white"),
+        legend.text = element_text(size = 20),
+        legend.position = c(0.15,0.10),
+        legend.title = element_blank(),
+        axis.text = element_text(size = 30, color = "black"),
+        axis.title = element_text(size = 30),
+        text = element_text(family = "Times"))
+  
+
+
+
+
+
+```
+
+
+# Permanova for Sugar Mol% between Mature and Senescent phase Kelp
+
+
+```{r}
+
+MP_DOM_sugar_c <- scale(MP_DOM_Sugar[1:42,6:14])
+
+# PERMANOVA of differences in carbohydrate composition by physiological state
+
+MP_DOM_sugar_physstate_adonis <- adonis(MP_DOM_sugar_c~phase, data = MP_DOM_Sugar[1:42,], method = "eu")
+
+MP_DOM_sugar_physstate_adonis # R2 = 0.14 p = 0.001
+
+
+# PERMANOVA of differences in carbohydrate composition by season 
+
+MP_DOM_sugar_season_adonis <- adonis(MP_DOM_sugar_c~season, data = MP_DOM_Sugar[1:42,], method = "eu")
+
+MP_DOM_sugar_season_adonis # R2 = 0.07 p = 0.007 **
+
+MP_DOM_sugar_phys_state_season_adonis <- adonis(MP_DOM_sugar_c~ phase + season, data = MP_DOM_Sugar[1:42,], method = "eu")
+
+MP_DOM_sugar_phys_state_season_adonis
+
+pairwiseAdonis::pairwise.adonis2(MP_DOM_sugar_phys_state_season_adonis)
+
+```
+
+
+# Fucose & Mannuronic Acid Boxplot over Time: SUMMER
+
+
+```{r}
+
+fucose_manURA_age <- MP_DOM_Sugar %>% 
+  filter(season == "Summer") %>% 
+  select(age_d, Fucose, `Man-URA`, blade) %>% 
+  pivot_longer(cols = Fucose: `Man-URA`,
+               names_prefix = "sugar",
+               values_to = "mol_percent") %>% 
+  mutate(age_d = as.factor(age_d))
+  
+boxplot_fucose_manURA_summer <- fucose_manURA_age %>% 
+  ggplot(aes(x = age_d, y = mol_percent*100, fill = name)) +
+  geom_boxplot() +
+   ggtitle(label = "Summer") + 
+  labs(x = "Age (d)",
+       y = "Mol%",
+       fill = "") +
+  scale_fill_manual(values = c("#022E73", "#9D3709")) +
+  geom_point( position=position_dodge(width=0.75)) +
+   theme(panel.background = element_rect(fill = "white", color = "black", size = 1.5),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        plot.margin = margin(1,1,1,1, "cm"),
+        plot.title = element_text(size = 24),
+        strip.background = element_rect(fill = "white", color = "black"),
+        legend.key = element_rect(fill = "white"),
+        legend.text = element_text(size = 24),
+        legend.key.height = unit(0.5, "inch"),
+        legend.key.width = unit(0.4, "inch"),
+        legend.position = "none",
+        legend.title = element_text(size = 20),
+        axis.text = element_text(size = 30, color = "black"),
+        axis.title = element_text(size = 30),
+        text = element_text(family = "Times"))
+
+
+
+
+```
+
+
+# Fucose & Mannuronic Acid Boxplot over Time: SPRING
+
+
+```{r}
+
+fucose_manURA_age_spring <- MP_DOM_Sugar %>% 
+  filter(season == "Spring") %>% 
+  select(age_d, Fucose, `Man-URA`, blade) %>% 
+  pivot_longer(cols = Fucose: `Man-URA`,
+               names_prefix = "sugar",
+               values_to = "mol_percent") %>% 
+  mutate(age_d = as.factor(age_d))
+  
+boxplot_fucose_manURA_spring <- fucose_manURA_age_spring %>% 
+  ggplot(aes(x = age_d, y = mol_percent*100, fill = name)) +
+  geom_boxplot() +
+  labs(x = "Age (d)",
+       y = "",
+       fill = "") +
+  ggtitle(label = "Spring") + 
+  scale_fill_manual(values = c("#022E73", "#9D3709")) +
+  geom_point( position=position_dodge(width=0.75)) +
+   theme(panel.background = element_rect(fill = "white", color = "black", size = 1.5),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        plot.margin = margin(1,1,1,1, "cm"),
+        strip.background = element_rect(fill = "white", color = "black"),
+        legend.key = element_rect(fill = "white"),
+        legend.text = element_text(size = 24),
+        plot.title = element_text(size = 24), 
+        legend.key.height = unit(0.5, "inch"),
+        legend.key.width = unit(0.4, "inch"),
+        legend.title = element_text(size = 20),
+        axis.text = element_text(size = 30, color = "black"),
+        axis.title = element_text(size = 30),
+        text = element_text(family = "Times"))
+
+
+
+
+```
+
+# Plot Avg DOC Release Rate by Blade against mol% of Mannuronic Acid
+
+```{r}
+DOC_mean_by_age_season_blade <- MP_DOC_NPP_phys_env_sum %>% 
+  filter(flag != 2 & season %in% c("Spring", "Summer")) %>% 
+  group_by(age_d, blade, season) %>% 
+  summarize(mean_DOC = mean(DOC_umolC_g_hr),
+            sd_DOC = sd(DOC_umolC_g_hr))
+
+DOC_Sugar <- merge(DOC_mean_by_age_season_blade, MP_DOM_Sugar, by = c("age_d", "blade", "season"))
+
+
+DOC_ManURA_p <- DOC_Sugar %>%
+  ggplot(aes(x = `Man-URA`*100, y = mean_DOC)) +
+  geom_point(size = 4) +
+  geom_errorbar(aes(ymin = mean_DOC - sd_DOC, ymax = mean_DOC + sd_DOC), width = 0) +
+  ylab(expression(DOC~Production~(µmolC ~ g[DW]^{"-1"} ~ hr^{"-1"}))) +
+  labs(x = "Man-URA (mol%)") +
+  geom_abline(intercept = -6.22, slope = 89.67/100, linetype = "dashed", color = "black") +
+ theme(panel.background = element_rect(fill = "white", 
+                                        color = "black", 
+                                        size = 1.5),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        plot.margin = margin(1,1,1,1, "cm"),
+        strip.background = element_rect(fill = "white", 
+                                        color = "black"),
+        legend.key = element_rect(fill = "white"),
+        legend.text = element_text(size = 20),
+        legend.title = element_text(size = 20),
+        axis.text = element_text(size = 30, 
+                                 color = "black"),
+        axis.title = element_text(size = 30),
+        text = element_text(family = "Times"))
+
+# DOC Release Rate ManURA LM
+
+
+DOC_ManURA_lm = lm(data = DOC_Sugar, mean_DOC ~ `Man-URA`)
+
+summary(DOC_ManURA_lm)# R2 = 0.48, p = 1.947e-07
+
+```
+
+
+
+
+
+
+# Summary: Avg Sugar mol% in Mature vs. Senescent phase
+
+```{r}
+
+sugar_summary <- MP_DOM_Sugar %>% 
+  select(phase, season,Fucose:`Man-URA`) %>% 
+  pivot_longer(cols = Fucose: `Man-URA`,
+               names_prefix = "sugar",
+               values_to = "mol_percent")%>% 
+  group_by(phase, name, season) %>% 
+  summarize(mean_molp = mean(mol_percent),
+            sd_molp = sd(mol_percent))
+  
+sugars_fold_change_phys_state <- sugar_summary %>% 
+  group_by(name) %>% 
+  summarise(fold_change = mean_molp[phase == "Senescent"]/mean_molp[phase == "Mature"])
+
+sugars_fold_change_season <- sugar_summary %>% 
+  group_by(phase, name) %>% 
+  summarise(fold_change = mean_molp[season == "Spring"]/mean_molp[season == "Summer"])
+
+```
+
+
+# Glucosamine Mature (16 days) Box Plot between Spring and Summer
+
+
+```{r}
+
+glucosamine_season_mature <- sugars %>% 
+  filter(age_d < 50) %>% 
+  select(season, Glucoseamine, blade) %>% 
+  pivot_longer(cols = Glucoseamine,
+               names_prefix = "sugar",
+               values_to = "mol_percent") 
+  
+boxplot_glucosamine_season_mature <- glucosamine_season_mature %>% 
+  ggplot(aes(x = season, y = mol_percent*100)) +
+  geom_boxplot(fill = "grey") +
+  labs(x = "",
+       y = "Mol%",
+       fill = "") +
+  scale_fill_manual(values = c("grey")) +
+  geom_point( position=position_dodge(width=0.75)) +
+   theme(panel.background = element_rect(fill = "white", color = "black", size = 1.5),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        plot.margin = margin(1,1,1,1, "cm"),
+        strip.background = element_rect(fill = "white", color = "black"),
+        axis.text = element_text(size = 30, color = "black"),
+        axis.title = element_text(size = 30),
+        text = element_text(family = "Times"))
+
+
+
+```
+
+# Glucosamine age and season 
+
+```{r}
+
+MP_DOM_Sugar_glucosamine <- sugars %>% 
+  filter(age_d %in% c(16, 77, 78)) %>% 
+  select(age_d, season, blade, Glucoseamine) %>% 
+  mutate(phase = case_when(
+    age_d >= 50 ~ "Senescent",
+    age_d < 50 ~ "Mature"
+  ))
+
+
+glucosamine_season <- MP_DOM_Sugar_glucosamine %>% 
+  select(age_d, season, Glucoseamine, blade, phase) %>% 
+  pivot_longer(cols = Glucoseamine,
+               names_prefix = "sugar",
+               values_to = "mol_percent") 
+
+
+glucosamine_molp_boxplot <- glucosamine_season %>% 
+  ggplot() +
+  geom_boxplot(aes(x = season, y = mol_percent*100, fill = phase)) +
+  geom_point(aes(x = season, y = mol_percent*100, color = phase),
+             position = position_jitterdodge(0.1)) +
+  labs(y = "Glucosamine (mole%)",
+       x = "",
+       color = "",
+       fill = "") +
+  scale_fill_manual(values = c("#266A25","#BD9C3D")) +
+  scale_color_manual(values = c("darkgreen","darkgoldenrod")) +
+  scale_y_continuous(limits = c(0,20)) +
+  theme(panel.background = element_rect(fill = "white", 
+                                        color = "black", 
+                                        size = 1.5),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        plot.margin = margin(1,1,1,1, "cm"),
+        strip.background = element_rect(fill = "white", 
+                                        color = "black"),
+        legend.key = element_rect(fill = "white"),
+        legend.text = element_text(size = 15),
+        legend.title = element_blank(),
+        legend.position = "none",
+        axis.text = element_text(size = 30, 
+                                 color = "black"),
+        axis.title = element_text(size = 30),
+        text = element_text(family = "Times"))
+
+# Two-way ANOVA Glucosamine vs. Season and Physiology
+
+
+aov.glucosamine.season.phase <- aov(data = MP_DOM_Sugar_glucosamine, Glucoseamine ~ season + phase)
+
+summary(aov.glucosamine.season.phase)
+
+TukeyHSD(aov.glucosamine.season.phase)
+
+
+```
+
+
+# Gluconic acid age and season 
+
+
+```{r}
+
+MP_DOM_Sugar_glcURA <- MP_DOM_Sugar %>% 
+  filter(age_d %in% c(16, 77, 78)) %>% 
+  select(age_d, season, blade, `Glc-URA`) 
+
+
+glcURA_season <- MP_DOM_Sugar_glcURA %>% 
+  select(age_d, season, `Glc-URA`, blade) %>% 
+  pivot_longer(cols = 'Glc-URA' ,
+               names_prefix = "sugar",
+               values_to = "mol_percent") 
+
+
+glcURA_molp_boxplot <- glcURA_season %>% 
+  mutate(phase = case_when(age_d < 50 ~ "Mature",
+                           age_d > 50 ~ "Senescent")) %>% 
+   ggplot(aes(phase, mol_percent)) +
+  geom_boxplot(position = "dodge") +
+  geom_point(size = 3) +
+  facet_wrap(~ season, strip.position = "bottom") +
+  theme_minimal() +
+   theme(panel.grid.major.x = element_blank(),
+        panel.grid.minor = element_blank(),
+        plot.margin = margin(1,1,1,1, "cm"),
+        strip.placement = "outside",
+        strip.background = element_rect(fill = "white", color = "white"),
+        legend.key = element_rect(fill = "white"),
+        legend.text = element_text(size = 20),
+        legend.key.height = unit(0.5, "inch"),
+        legend.key.width = unit(0.4, "inch"),
+        legend.title = element_text(size = 20),
+        axis.text = element_text(size = 20, color = "black"),
+        axis.title = element_text(size = 25),
+        text = element_text(family = "Times"),
+        strip.text = element_text(size = 20, face = "bold")) +
+  labs(x = "",
+       y = "Glc-URA (Mol%)")
+
+
+
+```
+
+
+# Repeated Measures ANOVA Fucose/Man-URA over Age: Summer
+
+
+```{r}
+
+# Outliers
+
+
+fucose_manURA_age %>% 
+  group_by(name, age_d) %>% 
+  identify_outliers(mol_percent)
+
+# Normality
+
+fucose_manURA_age %>% 
+  group_by(name, age_d) %>% 
+  shapiro_test(mol_percent)
+
+# QQ Plot
+
+ggqqplot(fucose_manURA_age, "mol_percent", ggtheme = theme_bw()) +
+  facet_grid(age_d ~ name, labeller = "label_both")
+
+# Test
+
+sugar_fucose_manURA_age.aov <- anova_test(
+  data = fucose_manURA_age, dv = mol_percent, wid = blade,
+  within = c(name, age_d)
+  )
+get_anova_table(sugar_fucose_manURA_age.aov)
+
+
+# Effect of treatment at each time point
+
+
+one.way <- fucose_manURA_age %>%
+  group_by(age_d) %>%
+  anova_test(dv = mol_percent, wid = blade, within = name) %>%
+  get_anova_table() %>%
+  adjust_pvalue(method = "bonferroni")
+one.way
+
+
+# Pairwise comparisons between treatment groups
+
+
+pwc <- fucose_manURA_age %>%
+  group_by(age_d) %>%
+  pairwise_t_test(
+    mol_percent ~ name, paired = TRUE,
+    p.adjust.method = "bonferroni"
+    )
+pwc
+
+write_csv(as.data.frame(pwc), "/Users/chanceenglish/Desktop/Lab Shiz/ARPA-e/Giant_Kelp_DOC/Data/summer_fucose_manURA_pairwise_t_test.csv")
+
+# Effect of time at each level of treatment
+
+one.way2 <- fucose_manURA_age %>%
+  group_by(name) %>%
+  anova_test(dv = mol_percent, wid = blade, within = age_d) %>%
+  get_anova_table() %>%
+  adjust_pvalue(method = "bonferroni")
+
+one.way2
+
+# Pairwise comparisons between time points
+
+pwc2 <- fucose_manURA_age %>%
+  group_by(name) %>%
+  pairwise_t_test(
+    mol_percent ~ age_d, paired = TRUE,
+    p.adjust.method = "bonferroni"
+    )
+
+pwc2
+
+pwc2_csv <- write_csv(as.data.frame(pwc2), "/Users/chanceenglish/Desktop/Lab Shiz/ARPA-e/Giant_Kelp_DOC/Data/summer_fucose_manURA_pairwise_t_test.csv" )
+
+# Plot 
+
+pwc <- pwc %>% add_xy_position(x = "Age (d)")
+
+bxp <- ggboxplot(
+  fucose_manURA_age, x = "age_d", y = "mol_percent", 
+  color = "name", palette = c("#00AFBB", "#E7B800")
+  )
+
+bxp +
+  stat_pvalue_manual(one.way$p.adj, tip.length = 0, hide.ns = TRUE) +
+  labs(
+    subtitle = get_test_label(sugar_fucose_manURA_age.aov, detailed = TRUE),
+    caption = get_pwc_label(pwc)
+  )
+  
+
+```
+
+# Repeated Measures ANOVA Fucose/Man-URA over Age: Spring
+
+
+```{r}
+
+# Outliers
+
+
+fucose_manURA_age_spring %>% 
+  group_by(name, age_d) %>% 
+  identify_outliers(mol_percent)
+
+# Normality
+
+fucose_manURA_age_spring %>% 
+  group_by(name, age_d) %>% 
+  shapiro_test(mol_percent)
+
+# QQ Plot
+
+ggqqplot(fucose_manURA_age_spring, "mol_percent", ggtheme = theme_bw()) +
+  facet_grid(age_d ~ name, labeller = "label_both")
+
+# Test
+
+sugar_fucose_manURA_age_spring.aov <- anova_test(
+  data = fucose_manURA_age_spring, dv = mol_percent, wid = blade,
+  within = c(name, age_d)
+  )
+get_anova_table(sugar_fucose_manURA_age_spring.aov)
+
+
+# Effect of treatment at each time point
+
+
+one.way_spring <- fucose_manURA_age_spring %>%
+  group_by(age_d) %>%
+  anova_test(dv = mol_percent, wid = blade, within = name) %>%
+  get_anova_table() %>%
+  adjust_pvalue(method = "bonferroni")
+
+one.way_spring
+
+
+# Pairwise comparisons between treatment groups
+
+
+pwc_spring <- fucose_manURA_age_spring %>%
+  group_by(age_d) %>%
+  pairwise_t_test(
+    mol_percent ~ name, paired = TRUE,
+    p.adjust.method = "bonferroni"
+    )
+
+pwc_spring
+
+write_csv(pwc_spring,  "/Users/chanceenglish/Desktop/Lab Shiz/ARPA-e/Giant_Kelp_DOC/Data/spring_fucose_manURA_pairwise_t_test.csv")
+
+# Effect of time at each level of treatment
+
+one.way2_spring <- fucose_manURA_age %>%
+  group_by(name) %>%
+  anova_test(dv = mol_percent, wid = blade, within = age_d) %>%
+  get_anova_table() %>%
+  adjust_pvalue(method = "bonferroni")
+
+one.way2_spring
+
+# Pairwise comparisons between time points
+
+pwc2_spring <- fucose_manURA_age_spring %>%
+  group_by(name) %>%
+  pairwise_t_test(
+    mol_percent ~ age_d, paired = TRUE,
+    p.adjust.method = "bonferroni"
+    )
+
+pwc2_spring
+
+# Plot 
+
+pwc_spring <- pwc_spring %>% add_xy_position(x = "Age (d)")
+
+bxp_spring <- ggboxplot(
+  fucose_manURA_age_spring, x = "age_d", y = "mol_percent", 
+  color = "name", palette = c("#00AFBB", "#E7B800")
+  )
+
+bxp_spring +
+  stat_pvalue_manual(one.way_spring$p.adj, tip.length = 0, hide.ns = TRUE) +
+  labs(
+    subtitle = get_test_label(sugar_fucose_manURA_age_spring.aov, detailed = TRUE),
+    caption = get_pwc_label(pwc_spring)
+  )
+  
+
+```
+
+# DOC Flux Senescence Rate and NLS Model DOC vs. ChlA
+
+
+```{r}
+
+senescent_kelp <- MP_DOC_NPP_phys_env_sum %>% 
+  group_by(season) %>%
+  filter(flag != 2) %>% 
+  summarise(norm_chlA = (chlA_nmol_g/mean(chlA_nmol_g[age_d == min(age_d)]))*100,
+            DOC_umolC_g_hr = DOC_umolC_g_hr,
+            age_d = age_d,
+            PAR = PAR,
+            NPP_umolC_g_hr = NPP_umolC_g_hr,
+            tissue_C_percent = tissue_C_percent,
+            dry_mass_g = dry_mass_g,
+            Chl_C = Chl_C,
+            blade = blade) %>% 
+  filter(age_d > 50)
+
+
+# NLS Model DOC production rate vs. Normalized Chl concentration 
+
+
+# Select an approximate $\theta$, since theta must be lower than min(y), and greater than zero
+theta.chlA <- min(senescent_kelp$DOC_umolC_g_hr) *0.99 
+
+# Estimate the rest parameters using a linear model
+model.chlA <- lm(log(DOC_umolC_g_hr - theta.chlA) ~ norm_chlA, data=senescent_kelp)
+
+alpha.chlA <- exp(coef(model.chlA)[1])
+beta.chlA <- coef(model.chlA)[2]
+
+# Starting parameters
+start <- list(alpha = alpha.chlA, beta = beta.chlA, theta = theta.chlA)
+start
+
+model_nls_senescent_DOC<- nls(DOC_umolC_g_hr ~ alpha * exp(beta * norm_chlA) + theta , data = senescent_kelp, start = start)
+
+model_nls_senescent_DOC
+
+summary(model_nls_senescent_DOC)
+
+R2.nls
+# Calculate R2 
+
+
+
+# Plot DOC release rate as a function of Chl:C w/ NLS Exponential Model Fit
+
+
+DOC_normCHLA_p <- senescent_kelp %>% 
+  ggplot(aes(x = norm_chlA, y = DOC_umolC_g_hr)) +
+   geom_point(size = 5, aes(color = age_d)) +
+   geom_smooth(aes(x = senescent_kelp$norm_chlA, y = senescent_kelp$DOC_umolC_g_hr),
+    method = "nls", se = FALSE,
+    formula = y ~ a * exp(b * x),
+    method.args = list(start = c(a = 31.43, b = -0.0331)), color = "black") +
+   scico::scale_color_scico(palette = "vik", breaks = c(50,60,70,80), limits = c(50,80)) +
+  labs(x = "Normalized Chl (% Initial)",
+       color = "Age (d)") +
+  scale_x_continuous(breaks = c(0,25,50,75,100), limits = c(0,100)) +
+  ylab(expression(DOC~Production~(µmolC ~ g[DW]^{"-1"} ~ hr^{"-1"}))) +
+  theme(panel.background = element_rect(fill = "white", color = "black", size = 1.5),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        plot.margin = margin(1,1,1,1, "cm"),
+        strip.background = element_rect(fill = "white", color = "black"),
+        legend.key = element_rect(fill = "white"),
+        legend.text = element_text(size = 24),
+        legend.key.height = unit(0.5, "inch"),
+        legend.key.width = unit(0.4, "inch"),
+        legend.title = element_text(size = 20),
+        axis.text = element_text(size = 30, color = "black"),
+        axis.title = element_text(size = 30),
+        text = element_text(family = "Times"))
+
+
+solubilization_rates <- MP_DOC_NPP_phys_env_sum %>% 
+  filter(age_d > 50 & flag != 2) %>% 
+  group_by(age_d, blade, season) %>% 
+  summarize(DOC = mean(DOC_umolC_g_hr),
+            sd_DOC = sd(DOC_umolC_g_hr),
+            dry_mass_g = dry_mass_g,
+            tissue_C_percent = tissue_C_percent,
+            Chl_C = Chl_C*1000,
+            daily_solubilization = ((DOC /1000/1000*12)*24)/((tissue_C_percent/100))*100) %>% 
+  distinct()
+        
+
+
+
+
+
+solubilization_rate_p <- senescent_kelp %>% 
+  mutate(daily_solubilization = ((DOC_umolC_g_hr/1000/1000*12.01)*24)/((tissue_C_percent/100))*100) %>% 
+  ggplot(aes(x = Chl_C, y = daily_solubilization/100)) +
+  geom_point(size = 5) +
+  xlab(expression(Chl:C~(mg^{"1"} ~ g^{"-1"}))) +
+  ylab(expression(Solubilization~Rate~(d^{"-1"}))) +
+  scale_x_continuous(breaks = c(0,2,4,6,8), limits = c(0,7)) +
+  scale_y_continuous(limits = c(0,0.08), breaks = c(0,0.02,0.04,0.06, 0.08)) +
+  geom_hline(yintercept = 0.025, linetype = "dashed", size = 1) +
+  geom_smooth(method="lm", formula= (y ~ exp(-x)), color=1) +
+  theme(panel.background = element_rect(fill = "white", color = "black", size = 1.5),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        plot.margin = margin(1,1,1,1, "cm"),
+        strip.background = element_rect(fill = "white", color = "black"),
+        legend.key = element_rect(fill = "white"),
+        legend.text = element_text(size = 24),
+        legend.key.height = unit(0.5, "inch"),
+        legend.key.width = unit(0.4, "inch"),
+        legend.title = element_text(size = 20),
+        axis.text = element_text(size = 30, color = "black"),
+        axis.title = element_text(size = 30),
+        text = element_text(family = "Times"))
+
+solubilization_rates <- senescent_kelp %>% 
+  group_by(age_d, blade,season) %>% 
+  summarize(DOC_umolC_g_hr = mean(DOC_umolC_g_hr),
+            tissue_C_percent = max(tissue_C_percent),
+            Chl_C = max(Chl_C),
+            dry_mass_g = max(dry_mass_g)) %>% 
+  mutate(daily_solubilization = ((DOC_umolC_g_hr/1000/1000*12.01)*24)/((tissue_C_percent/100))*100)
+
+
+solubilization_plot <- solubilization_rates %>% 
+  ungroup() %>% 
+  mutate(predicted_solub_rate = predict(solub_chlC_lm, solubilization_rates)) %>% 
+  ggplot(aes(x = Chl_C, y = daily_solubilization)) +
+  geom_point(size = 5) +
+  xlab(expression(Chl:C~(mg^{"1"} ~ g^{"-1"}))) +
+  ylab(expression(Solubilization~Rate~("%"~d^{"-1"}))) +
+  scale_x_continuous(breaks = c(0,2,4,6,8,10,12)) +
+  scale_y_continuous(breaks = c(0,2,4,6,8,10)) +
+  geom_smooth(method = "lm", formula = (y ~ exp(-x)), se = FALSE, color = "black") +
+  theme(panel.background = element_rect(fill = "white", color = "black", size = 1.5),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        plot.margin = margin(1,1,1,1, "cm"),
+        strip.background = element_rect(fill = "white", color = "black"),
+        legend.key = element_rect(fill = "white"),
+        legend.text = element_text(size = 24),
+        legend.key.height = unit(0.5, "inch"),
+        legend.key.width = unit(0.4, "inch"),
+        legend.title = element_text(size = 20),
+        axis.text = element_text(size = 20, color = "black"),
+        axis.title = element_text(size = 24),
+        text = element_text(family = "Times"))
+
+
+sol_summary <- solubilization_rates %>% 
+  ungroup() %>% 
+  summarize(mean_SR = mean(daily_solubilization),
+            minSR = min(daily_solubilization),
+            maxSR = max(daily_solubilization),
+            sdSR = sd(daily_solubilization))
+
+
+solubilization_chl_C <- lm(log(daily_solubilization) ~ Chl_C, data = solubilization_rates)
+
+summary(solubilization_chl_C)
+
+prediction_interval <- exp(predict(
+  solubilization_chl_C, 
+  newdata = solubilization_rates,
+  interval="prediction",
+  level = 0.95
+  ))
+
+
+```
+
+# Stats: Exponential Regression of Solubilization Rates and Chl:C
+
+```{r}
+
+solub_chlC_lm <- lm(daily_solubilization ~ exp(-Chl_C) ,data =solubilization_rates)
+
+summary(solub_chlC_lm)
+
+Chl_C <- solubilization_rates$Chl_C
+
+predicted_solubilization_rates <- predict(solub_chlC_lm, solubilization_rates)
+
+new_x      <- seq(min(Chl_C), max(Chl_C), )
+
+prediction <- exp(predict(solub_chlC_lm, newdata = list(x = new_x)))
+
+exp_line   <- data.frame(x = new_x, y = prediction)
+
+
+
+```
+
+
+
+# Senescent DOC vs NPP 
+
+```{r}
+
+
+doc_NPP_senescent <- senescent_kelp %>% 
+  ggplot(aes(x = NPP_umolC_g_hr, y = DOC_umolC_g_hr, color = PAR)) +
+  geom_point(size = 7) +
+   geom_abline(intercept = 0, slope = 1, linetype = "dashed", size = 2) +
+  ylab(expression(DOC~Production~(µmolC ~ g[DW]^{"-1"} ~ hr^{"-1"}))) +
+  xlab(expression(NPP~(µmolC ~ g[DW]^{"-1"} ~ hr^{"-1"}))) +
+  labs(color = "PAR") + 
+  scale_x_continuous(limits = c(-50,300),breaks = c(-50,0,100,200,300)) +
+   scale_color_viridis_b(breaks = c(0,50,100,250,500,1000,1500), limits = c(0,1500), name = expression(paste("PAR (µmol ",m^-2, s^-1,")"))) +
+  theme(panel.background = element_rect(fill = "white", color = "black", size = 1.5),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        plot.margin = margin(1,1,1,1, "cm"),
+        strip.background = element_rect(fill = "white", color = "black"),
+        legend.key = element_rect(fill = "white"),
+        legend.text = element_text(size = 20),
+        legend.key.height = unit(0.5, "inch"),
+        legend.key.width = unit(0.4, "inch"),
+        legend.title = element_text(size = 24),
+        axis.text = element_text(size = 30, color = "black"),
+        axis.title = element_text(size = 25),
+        text = element_text(family = "Times"))
+
+
+
+doc_PAR_senescent <- senescent_kelp %>% 
+  ggplot(aes(x = PAR, y = DOC_umolC_g_hr)) +
+  geom_point(size = 7) +
+  ylab(expression(DOC~Production~(µmolC ~ g[DW]^{"-1"} ~ hr^{"-1"}))) +
+  xlab(expression(expression(paste("PAR (µmol ",m^-2, s^-1,")")))) +
+  labs(color = "PAR") + 
+  theme(panel.background = element_rect(fill = "white", color = "black", size = 1.5),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        plot.margin = margin(1,1,1,1, "cm"),
+        strip.background = element_rect(fill = "white", color = "black"),
+        legend.key = element_rect(fill = "white"),
+        legend.text = element_text(size = 20),
+        legend.key.height = unit(0.5, "inch"),
+        legend.key.width = unit(0.4, "inch"),
+        legend.title = element_text(size = 24),
+        axis.text = element_text(size = 30, color = "black"),
+        axis.title = element_text(size = 25),
+        text = element_text(family = "Times"))
+
+
+# Model II Senescent DOC vs NPP and PAR
+
+senescent_DOC_NPP <- lmodel2(DOC_umolC_g_hr~NPP_umolC_g_hr, data = senescent_kelp)
+
+
+senescent_DOC_PAR <- lmodel2(DOC_umolC_g_hr~PAR, data = senescent_kelp)
+
+
+```
+
+
+
+
+# Modeling Kelp Biomass Loss from Senescence into POC and DOC
+## Using solubilization rate of 0.025
+## Using POC shedding rate of 0.0034 (+ 2SD from Average POC shedding rate)
+
+
+```{r}
+
+kelp_biomass <- 100
+
+senescence_function <- function(x){
+  biomass_proportion <- (100*(1 -(-0.0002*0.0036 + 0.0000058*(0.0036^2) + 0.0036)*x))
+  print(biomass_proportion)
+}
+
+biomass_remianing <- sapply(51:100, senescence_function)
+
+
+
+
+
+age <- seq(51,100, by = 1)
+timepoint <- seq(1,50, by = 1)
+
+
+age_df <- data.frame(age, biomass_remianing)
+
+biomass_solubilization_plot <- age_df %>% 
+  ggplot() +
+  geom_line(aes(x = age, y = biomass_remianing, color = "black"),size = 2) +
+  geom_line(aes(x = age, y = 100-biomass_remianing, color = "red"), size = 2) +
+  ylab("% Biomass") +
+  xlab("Age (d)") +
+  labs(color = c("Biomass", "DOC")) +
+  scale_color_manual(values = c("black", "red"), labels = c("Biomass", "DOC")) +
+  scale_y_continuous(limits = c(0,100), breaks = c(0,25,50,75,100)) +
+  theme(panel.background = element_rect(fill = "white", color = "black", size = 1.5),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        plot.margin = margin(1,1,1,1, "cm"),
+        strip.background = element_rect(fill = "white", color = "black"),
+        legend.key = element_rect(fill = "white"),
+        legend.text = element_text(size = 24),
+        legend.key.height = unit(0.5, "inch"),
+        legend.key.width = unit(0.4, "inch"),
+        legend.title = element_blank(),
+        axis.text = element_text(size = 30, color = "black"),
+        axis.title = element_text(size = 30),
+        text = element_text(family = "Times"))
+
+
+```
+
+
+# Stoichiometry of DOM 
+
+```{r}
+
+MP_age_data_sum %>% 
+  group_by(age_d) %>% 
+  summarize(age = age_d, mean_DOC = mean(delta_DOC_uMC), mean_DON = mean(delta_DON_uMN), sd_DOC = sd(delta_DOC_uMC), sd_DON = sd(delta_DON_uMN)) %>% 
+  ggplot(aes(x = age, y = mean_DOC/mean_DON)) +
+  geom_point(size = 5) +
+  labs(x = "Age (d)",
+       y = "Exudate C:N") +
+  theme(panel.background = element_rect(fill = "white", color = "black", size = 1.5),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        plot.margin = margin(1,1,1,1, "cm"),
+        strip.background = element_rect(fill = "white", color = "black"),
+        legend.key = element_rect(fill = "white"),
+        legend.text = element_text(size = 24),
+        legend.key.height = unit(0.5, "inch"),
+        legend.key.width = unit(0.4, "inch"),
+        legend.title = element_text(size = 20),
+        axis.text = element_text(size = 30, color = "black"),
+        axis.title = element_text(size = 30),
+        text = element_text(family = "Times"))
+
+
+
+
+
+```
+
+# Bell & Siegel Chl a vs Age Data 
+
+```{r}
+
+
+bell_chla_age <- read_xlsx("Cohort_Chl.xlsx") %>% 
+  filter(prop_original <= 1)
+
+
+bell_prop_chla_age_p <- bell_chla_age %>% 
+  ggplot(aes(y = Age, 
+             x = prop_original)) +
+  geom_point(size = 6) +
+  xlab(expression(Chl~a~(nmol ~ g^{"-1"}))) +
+  labs(y = "Age (d)") + 
+  scale_y_continuous(limits = c(0,100), breaks = c(0,25,50,75,100)) +
+  theme(panel.background = element_rect(fill = "white", 
+                                        color = "black", 
+                                        size = 1.5),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        plot.margin = margin(1,1,1,1, "cm"),
+        strip.background = element_rect(fill = "white", 
+                                        color = "black"),
+        legend.key = element_rect(fill = "white"),
+        legend.text = element_text(size = 20),
+        legend.title = element_text(size = 20),
+        axis.text = element_text(size = 30, 
+                                 color = "black"),
+        axis.title = element_text(size = 30),
+        text = element_text(family = "Times"))
+
+
+lm_age_proportion_initial_chlA <- lm(Age~prop_original, data = bell_chla_age)
+
+lm_age_proportion_initial_chlA
+summary(lm_age_proportion_initial_chlA)
+
+```
+
+# Normalize Chl values to orignal 
+
+```{r}
+
+
+MP_modeled_age_df <- MP_DOC_NPP_phys_env_sum_noflags %>% 
+  filter(season != "NA",
+          DOC_umolC_g_hr >0) %>% 
+  select(season, age_d, chlA_nmol_g, DOC_umolC_g_hr, tissue_C_percent, PAR) %>% 
+  group_by(season) %>%
+  summarise(norm_chlA = (chlA_nmol_g/mean(chlA_nmol_g[age_d == min(age_d)])),
+            DOC_umolC_g_hr = DOC_umolC_g_hr,
+            age_d = age_d,
+            norm_chlA = norm_chlA,
+            modeled_age_d = norm_chlA*(-76.185) + 100.468,
+            daily_solubilization = ((DOC_umolC_g_hr/1000/1000*12)*24)/((tissue_C_percent/100))*100,
+            PAR = PAR) # 
+
+
+model_age_DOC_lm <- lm(DOC_umolC_g_hr ~ poly(modeled_age_d,2, raw = TRUE) , data = MP_modeled_age_df)
+
+summary(model_age_DOC_lm)
+
+
+model_age_solubilization_lm <- lm(daily_solubilization ~ poly(modeled_age_d,2, raw = TRUE) , data = MP_modeled_age_df)
+
+summary(model_age_solubilization_lm)
+
+
+doc_production_chlA_normalized <- MP_modeled_age_df %>% 
+  ggplot(aes(x = norm_chlA*100, 
+             y = DOC_umolC_g_hr)) +
+  geom_point(aes(color = season), size = 3) +
+  scale_color_manual(values = c("blue", "black")) +
+  ylab(expression(DOC~Production~(µmolC ~ g[DW]^{"-1"} ~ hr^{"-1"}))) +
+  labs(x = "Normalized ChlA (% Initial)",
+       color = "") +
+  scale_y_continuous(limits = c(0,75), breaks = c(0,25,50,75,100)) +
+  theme(panel.background = element_rect(fill = "white", 
+                                        color = "black", 
+                                        size = 1.5),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        plot.margin = margin(1,1,1,1, "cm"),
+        legend.position = c(0.8,0.8),
+        strip.background = element_rect(fill = "white", 
+                                        color = "black"),
+        legend.key = element_rect(fill = "white"),
+        legend.text = element_text(size = 20),
+        legend.title = element_text(size = 20),
+        axis.text = element_text(size = 30, 
+                                 color = "black"),
+        axis.title = element_text(size = 30),
+        text = element_text(family = "Times"))
+  
+  
+age_modeled_age <- MP_DOC_NPP_phys_env_sum_noflags %>% 
+  filter(season != "NA") %>% 
+  select(season, age_d, chlA_nmol_g, DOC_umolC_g_hr) %>% 
+  group_by(season) %>%
+  summarise(norm_chlA = (chlA_nmol_g/mean(chlA_nmol_g[age_d == min(age_d)])),
+            DOC_umolC_g_hr = DOC_umolC_g_hr,
+            age_d = age_d,
+            modeled_age_d = norm_chlA*(-62.266) + 95.685) %>% 
+  ggplot(aes(y = age_d, 
+             x = modeled_age_d)) + 
+  geom_point(size = 3) +
+  geom_abline(slope = 1, intercept = 0) +
+  scale_x_continuous(breaks = c(0,25,50,75,100), limits = c(0,100)) +
+  scale_y_continuous(breaks = c(0,25,50,75,100), limits = c(0,100)) +
+  theme(panel.background = element_rect(fill = "white", 
+                                        color = "black", 
+                                        size = 1.5),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        plot.margin = margin(1,1,1,1, "cm"),
+        strip.background = element_rect(fill = "white", 
+                                        color = "black"),
+        legend.key = element_rect(fill = "white"),
+        legend.text = element_text(size = 20),
+        legend.title = element_text(size = 20),
+        axis.text = element_text(size = 30, 
+                                 color = "black"),
+        axis.title = element_text(size = 30),
+        text = element_text(family = "Times"))
+
+
+
+
+
+
+```
+

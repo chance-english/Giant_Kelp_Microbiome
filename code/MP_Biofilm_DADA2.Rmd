@@ -1,0 +1,723 @@
+---
+title: "MP_Biofilm_DADA2"
+author: "Chance English"
+date: "9/13/2024"
+output: html_document
+---
+
+```{r setup, include=FALSE, message=FALSE, echo=FALSE, warning=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, echo = FALSE, warning = FALSE)
+```
+
+
+```{r}
+
+library(tidyverse)
+library(dada2)
+library(ShortRead)
+library(beepr)
+library(phyloseq)
+library(ggplot2)
+library(dplyr)
+library(RColorBrewer)
+library(tidyverse)
+library(here)
+library(ggpubr)
+
+
+library(janitor)
+library(ggsci)
+library(lubridate)
+library(readxl)
+library(growthcurver)
+library(zoo)
+library(scales)
+library(kableExtra)
+library(broom)
+
+library(dplyr)
+library(RColorBrewer)
+
+library(reshape2)
+library(vegan)
+library(indicspecies)
+library(readr)
+library(ggrepel)
+
+```
+
+
+# Import Files 
+
+
+```{r}
+
+path <- "/Users/chanceenglish/Desktop/Lab Shiz/ARPA-e/Giant_Kelp_Microbiome/Inputdata/fastq"
+
+#store names of forward and reverse files as lists 
+
+fnFS <- list.files(path, pattern = "_R1_001.fastq", full.names = TRUE)
+
+fnRS <- list.files(path, pattern = "_R2_001.fastq", full.names = TRUE)
+
+
+
+
+```
+
+
+# Retreive Orientation of Primers 
+
+Our primers target the V4 region and are known as 514F-Y and 806RB primers (Appril et al. 2015)
+
+```{r}
+
+FWD <- "GTGYCAGCMGCCGCGGTAA"
+REV <- "GGACTACNVGGGTWTCTAAT"
+
+all_orients <- function(primer) {
+  require(Biostrings)
+  dna <- DNAString(primer)
+  orients <- c(forward = dna, complement = complement(dna), reverse = reverse(dna),
+               reverse_complement = reverseComplement(dna))
+  return(sapply(orients, toString))
+}
+
+
+# Store Forward and Reverse orientations separately 
+
+FWD.orients <- all_orients(FWD)
+REV.orients <- all_orients(REV)
+
+
+
+
+```
+
+
+
+# Search for Primers
+
+
+```{r}
+
+primerHits <- function(primer, fn) {
+  nhits <- vcountPattern(primer, sread(readFastq(fn)), fixed = FALSE)
+  return(sum(nhits>0))
+}
+
+
+rbind(FWD.ForwardReads = sapply(FWD.orients, primerHits, fn = fnFS[[1]]),
+      FWD.ReverseReads = sapply(FWD.orients, primerHits, fn = fnRS[[1]]),
+      REV.ForwardReads = sapply(REV.orients, primerHits, fn = fnFS[[1]]),
+      REV.ReverseReads = sapply(REV.orients, primerHits, fn = fnRS[[1]]))
+
+
+
+
+```
+
+# Inspect Read Quality Profiles 
+
+Should always look at some of your sequences to assess the quality of the sequencing run. 
+
+## Forward Reads 
+
+```{r, fig.height=10, fig.width=12}
+
+plotQualityProfile(fnFS[24:34])
+
+
+# Good score, will trim forward at 240
+
+
+```
+
+
+
+```{r}
+
+plotQualityProfile(fnRS[1:5])
+
+# For samples 24:34 pretty high quality score to about 220. Running for samples 1:5 also
+
+# Lower quality score for samples 1:5 drops between 150 - 200
+
+
+
+
+```
+
+# Filtering and Trimming
+
+Don't want to trim our raw sequences. We want to create a new folder that contains the new trimmed sequences. 
+
+
+```{r}
+
+#Get sampole names
+
+#define the basenames of the FnFS as the first part of each file name until the "_L"
+#Apply this to all files 
+
+
+sample.names <- sapply(strsplit(basename(fnFS), "_L00"), '[',1)
+sample.names
+
+# Create a filtered folder in the working directory as a palce to put all the new filtered fastq files.
+
+filt_path <- file.path(path, "filtered_MP_Biofilm_path")
+
+# Add the appropriate designation string to any new files made that will be put nto the filtered path 
+
+filtFS <- file.path(filt_path, paste0(sample.names, "_F_filt.fastq"))
+filtRS <- file.path(filt_path, paste0(sample.names, "_R_filt.fastq"))
+
+
+```
+
+
+```{r}
+
+out <- filterAndTrim(fnFS, filtFS, fnRS, filtRS, truncLen = c(240,150), maxN = 0, 
+                     maxEE = c(2,2), truncQ = 2, rm.phix = TRUE, compress = TRUE)
+
+
+
+out
+
+```
+
+
+# Learn the error rates
+
+
+```{r}
+
+errF <- learnErrors(filtFS, multithread = TRUE)
+
+errR <- learnErrors(filtRS, multithread = TRUE)
+
+beep(sound = 8)
+```
+
+
+
+
+```{r, warning=FALSE, echo=FALSE, message=FALSE, fig.height=10, fig.width=12, fig.align='center'}
+
+
+plotErrors(errF, nominalQ = TRUE)
+
+
+
+
+
+```
+
+
+
+
+```{r, warning=FALSE, echo=FALSE, message=FALSE, fig.height=10, fig.width=12, fig.align='center'}
+
+
+plotErrors(errR, nominalQ = TRUE)
+
+
+
+```
+
+
+How well does the error model (black line) fit the errors (black dots)? Also the error rate (y axis) should generally decrease with increase quality score. 
+
+
+
+# Dereplication 
+
+
+Dada2 will combine all replicate sequences into once unique sequence, keeping track of the number of identical sequences
+
+
+
+```{r}
+
+derepFS <- derepFastq(filtFS, verbose = TRUE)
+derepRS <- derepFastq(filtRS, verbose = TRUE)
+
+# Name the derep samples by the sample names 
+
+names(derepFS) <- sample.names
+names(derepRS) <- sample.names
+
+
+```
+
+
+# Infer the sequence variants 
+
+Apply core dada2 sample inference algorithm to the dereplicated data 
+
+Infer sequence variants in each sample taking out the variants that have excessive error rates. (i.e we are applying the error models to the data). Apply earlier model from a subset of the data to the whole dataset to determine which sequences are real and which are not. 
+
+
+```{r}
+
+dadaFS <- dada(derepFS, err = errF, multithread = TRUE)
+dadaRS <- dada(derepRS, err = errR, multithread = TRUE)
+beep(3)
+
+
+```
+
+
+Merge the overlapping reads. This will decrease the number of sequence variants. Will decrease the total number of sequences. 
+
+
+```{r}
+
+mergers <- mergePairs(dadaFS, derepFS, dadaRS, derepRS, verbose = TRUE, trimOverhang = TRUE)
+
+beep(6)
+
+#trimOverhang overhang will remove hits from earlier when checking for primers. 
+
+```
+
+
+
+```{r}
+
+head(mergers[[1]])
+
+
+
+```
+
+Save the unassigned merger data into output data file
+
+
+```{r}
+
+
+
+saveRDS(mergers, "/Users/chanceenglish/Desktop/Lab Shiz/ARPA-e/Giant_Kelp_Microbiome/Outputdata/dada_merged_MP_Biofilm.rds")
+
+mergers <- readRDS("/Users/chanceenglish/Desktop/Lab Shiz/ARPA-e/Giant_Kelp_Microbiome/Outputdata/dada_merged_MP_Biofilm.rds")
+
+```
+
+
+Construct a sequence table of our samples that is analagous to the OTU table produced by classical methods
+
+```{r}
+
+seqtable <- makeSequenceTable(mergers)
+
+
+dim(seqtable)
+
+
+write.table(t(seqtable), file="seqtable.txt",sep = ",",row.names=FALSE, col.names=TRUE)
+
+
+
+```
+
+Check the distribution of the sequence lengths 
+
+```{r}
+
+table(nchar(getSequences(seqtable)))
+
+
+```
+
+# Remove Chimeras 
+
+In POCR two or more biological sequences can attach to eachother and then polymerase builds a non-biological sequence
+
+```{r}
+
+seqtable_nochim <- removeBimeraDenovo(seqtable, verbose = TRUE)
+
+
+
+
+dim(seqtable_nochim)
+
+```
+
+# Assign Taxonomy using Silva Reference Database (v138)
+
+```{r}
+
+taxa <- assignTaxonomy(seqtable_nochim, "/Users/chanceenglish/Desktop/Lab Shiz/ARPA-e/Giant_Kelp_Microbiome/Inputdata/silva_nr99_v138.1_wSpecies_train_set.fa.gz", multithread = TRUE)
+
+beep(10)
+
+
+
+```
+
+
+Create a table out of the taxa data (one with the sequences and assignments, one with just the taxa.)
+
+
+```{r}
+
+
+
+
+saveRDS(t(seqtable_nochim), "/Users/chanceenglish/Desktop/Lab Shiz/ARPA-e/Giant_Kelp_Microbiome/Outputdata/seqtable_nochim.rds")
+
+saveRDS(taxa, "/Users/chanceenglish/Desktop/Lab Shiz/ARPA-e/Giant_Kelp_Microbiome/Outputdata/taxa.rds")
+
+beep(6)
+
+```
+
+# Create a Seqtable with Taxa and Sample Names for Columns
+
+
+```{r}
+
+seqtable_df <- as.data.frame(seqtable)
+
+taxatable_df <- as.data.frame(taxa.table)
+
+sampletable_df <- as.data.frame(sample.table)
+
+
+
+seqtable_df_t <- as.data.frame(t(seqtable_df)) 
+
+seqtable_df_t <- seqtable_df_t %>% 
+  rownames_to_column(var = "sequence")
+
+
+taxa_table_sequence_rownames <- taxatable_df %>% 
+  rownames_to_column(var = "sequence")
+
+
+seqtab_nochim_taxa <- merge(seqtable_df_t, taxa_table_sequence_rownames, by = "sequence") %>% 
+  as.data.frame()
+
+write.csv(seqtab_nochim_taxa, "/Users/chanceenglish/Desktop/Lab Shiz/ARPA-e/Giant_Kelp_Microbiome/Outputdata/seqtab_nochim_taxa.csv", row.names = FALSE)
+
+```
+
+
+# NMDS
+
+
+```{r}
+
+sampletable_df_nmds <- read_csv(here("Inputdata", "sampledata", "MP_Biofilm_Samples_Metadata.csv"))
+
+
+
+seqtab_nochim_taxa <- read_csv(here("Outputdata", "seqtab_nochim_taxa.csv"))
+
+
+MP_Biofilm_counts_taxa_table <- seqtab_nochim_taxa %>% 
+  select(sequence, MP_230809_B1_S1:MP_240616_B6_S54, Kingdom, Phylum, Class, Order, Family, Genus, Species) %>% 
+  filter(Family != "Mitochondria" & Order != "Chloroplast")
+
+
+# Filter out samples with bad PCR results 
+
+MP_Biofilm_counts_taxa_table_taxa <- MP_Biofilm_counts_taxa_table %>% 
+  select(sequence, c(Kingdom:Species))
+  
+
+MP_Biofilm_counts_taxa_table_goodPCR <- MP_Biofilm_counts_taxa_table %>% 
+  select(-c(Kingdom:Species)) %>% 
+  column_to_rownames(var = "sequence") %>% 
+  .[,colSums(.) >15000] %>% 
+  rownames_to_column(var = "sequence")
+
+# Return dataframe containing only samples with greater than 10,000 sequence reads 
+
+MP_Biofilm_counts_taxa_table_goodPCR_wTaxa <- merge(MP_Biofilm_counts_taxa_table_goodPCR, MP_Biofilm_counts_taxa_table_taxa, by = "sequence")
+
+MP_Biofilm_counts_taxa_table_goodPCR_wTaxa_long <- MP_Biofilm_counts_taxa_table_goodPCR_wTaxa %>% 
+  select(-c(Kingdom:Species)) %>% 
+  column_to_rownames(var = "sequence") %>% 
+  t() 
+  
+
+
+raremax <- min(rowSums(MP_Biofilm_counts_taxa_table_goodPCR_wTaxa_long))
+
+MP_Biofilm_counts_table_rarefied <- rrarefy(MP_Biofilm_counts_taxa_table_goodPCR_wTaxa_long, raremax)
+
+# Transpose to remove sequences that have 0 counts. Residual from other sampled from different envronment and project from the DY111 sample set
+
+MP_Biofilm_counts_table_rarefied_long <- MP_Biofilm_counts_table_rarefied %>% 
+  t()
+
+MP_Biofilm_counts_table_rarefied_long.df <- as.data.frame(MP_Biofilm_counts_table_rarefied_long)
+
+MP_Biofilm_counts_table_rarefied_long.df[is.na(MP_Biofilm_counts_table_rarefied_long.df)] <- 0
+
+MP_Biofilm_counts_table_rarefied_long.df[] <- lapply(MP_Biofilm_counts_table_rarefied_long.df, as.numeric)
+
+MP_Biofilm_counts_table_rarefied_long.df <- MP_Biofilm_counts_table_rarefied_long.df %>%
+  filter(rowSums(across(where(is.numeric)))!=0)
+
+# Transpose back to calculate NMDS for quality filtered and rarefied DY111 data set 
+
+MP_Biofilm_counts_table_rarefied_long.df <- MP_Biofilm_counts_table_rarefied_long.df %>% 
+  t()
+
+com <- MP_Biofilm_counts_table_rarefied_long.df[,1:ncol(MP_Biofilm_counts_table_rarefied_long.df)] 
+
+
+
+m_com <- as.matrix(com)
+
+nmds = metaMDS(m_com, dsitance = "bray")
+
+
+
+data.scores = as.data.frame(scores(nmds)) %>% 
+  rownames_to_column(var = "DNA_SampleID")
+
+
+
+```
+
+# Merge NMDS with Sample Metadata
+
+```{r}
+
+
+MP_Biofilm_Sample_Data_NMDS <- merge(sampletable_df_nmds, data.scores, by = "DNA_SampleID")
+
+
+
+
+# Plot results of community composition across potential density 
+
+NMDS_p_biofilm <- MP_Biofilm_Sample_Data_NMDS %>% 
+  ggplot(aes(x = NMDS1, y = NMDS2, color = age_d, shape = season)) +
+  geom_point(size = 7) +
+  labs(color = "Age (d)",
+       shape = "") +
+  scico::scale_color_scico(palette = "vik", breaks = c(0,25,50,75,100)) +
+  theme(panel.background = element_rect(fill = "white", color = "black", size = 1.5),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        plot.margin = margin(1,1,1,1, "cm"),
+        strip.background = element_rect(fill = "white", color = "black"),
+        legend.key = element_rect(fill = "white"),
+        legend.text = element_text(size = 20),
+        legend.key.height = unit(0.5, "inch"),
+        legend.key.width = unit(0.4, "inch"),
+        legend.title = element_text(size = 24),
+        axis.text = element_text(size = 30, color = "black"),
+        axis.title = element_text(size = 25),
+        text = element_text(family = "Times")) 
+
+
+
+
+```
+
+
+# Calculate diversity metrics 
+
+
+```{r}
+
+
+# Rarefied Sequence and Counts Table: No Taxa
+
+MP_Biofilm_rarefied_seqtab_nochim_notaxa.df <- as.data.frame(MP_Biofilm_counts_table_rarefied_long)
+
+MP_Biofilm_rarefied_seqtab_nochim_notaxa.mx <- as.matrix(MP_Biofilm_counts_table_rarefied_long)
+# Taxa Table for onlt Taxa with Sequences in the Counts Table
+
+MP_Biofilm_rarefied_seqtab_nochim_notaxa_sequence.mx <- as.matrix(MP_Biofilm_rarefied_seqtab_nochim_notaxa.df %>% 
+  rownames_to_column(var = "sequence")  %>% 
+  select(sequence))
+
+
+MP_Biofilm_all_taxa <- MP_Biofilm_counts_taxa_table  %>% 
+  select(c(sequence,Kingdom:Species))
+
+MP_Biofilm_rarefied_taxa <- as.matrix(merge(MP_Biofilm_rarefied_seqtab_nochim_notaxa_sequence.mx, MP_Biofilm_all_taxa, by = "sequence") %>% 
+  column_to_rownames(var = "sequence"))
+
+
+
+# Save Rarefied Sequence Counts and Taxa as RDS for phyloseq
+
+
+saveRDS(MP_Biofilm_rarefied_seqtab_nochim_notaxa.mx,"/Users/chanceenglish/Desktop/Lab Shiz/ARPA-e/Giant_Kelp_Microbiome/Outputdata/rarefied_seqtab_notaxa.rds")
+
+saveRDS(MP_Biofilm_rarefied_taxa,"/Users/chanceenglish/Desktop/Lab Shiz/ARPA-e/Giant_Kelp_Microbiome/Outputdata/rarefied_taxa.rds")
+
+saveRDS(MP_Biofilm_Sample_Data_NMDS,"/Users/chanceenglish/Desktop/Lab Shiz/ARPA-e/Giant_Kelp_Microbiome/Outputdata/sample_table.rds")
+
+# Read in RDS Count and Taxa Table
+
+count_table_diversity <- readRDS("/Users/chanceenglish/Desktop/Lab Shiz/ARPA-e/Giant_Kelp_Microbiome/Outputdata/rarefied_seqtab_notaxa.rds")
+
+taxa_table_diversity <- readRDS("/Users/chanceenglish/Desktop/Lab Shiz/ARPA-e/Giant_Kelp_Microbiome/Outputdata/rarefied_taxa.rds")
+
+sample.table_diversity <- readRDS("/Users/chanceenglish/Desktop/Lab Shiz/ARPA-e/Giant_Kelp_Microbiome/Outputdata/sample_table.rds") %>% 
+  drop_na(DNA_SampleID) %>% 
+  column_to_rownames(var = "DNA_SampleID")
+
+
+# Generate Phyloseq Object
+
+OTU = otu_table(count_table_diversity, taxa_are_rows = TRUE)
+TAX = tax_table(taxa_table_diversity)
+
+
+ps = phyloseq(OTU, TAX)
+
+
+# Calcualte Richness Statistics 
+
+richness_df <- estimate_richness(ps, measures = c("Chao1", "Shannon")) %>%
+  rownames_to_column(., var = "DNA_SampleID")
+
+
+MP_biofilm_samples_richness <- merge(MP_Biofilm_Sample_Data_NMDS, richness_df, by = "DNA_SampleID")
+
+
+
+
+
+# Plot Chao1
+
+ Shannon_div_plot <- MP_biofilm_samples_richness%>%
+  ggplot(aes(x = age_d, y = Shannon, color = season)) +
+  geom_point() +
+  labs(x = "Age (d)",
+       y = "Shannon (H')",
+       color = "") +
+   stat_smooth(aes(color = season), method = "lm", formula = y ~ poly(x, 2), size = 2, se = FALSE) +
+   scale_color_manual(values = c("red", "black")) +
+   theme(panel.background = element_rect(fill = "white", color = "black", size = 1.5),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        plot.margin = margin(1,1,1,1, "cm"),
+        strip.background = element_rect(fill = "white", color = "black"),
+        legend.key = element_rect(fill = "white"),
+        legend.text = element_text(size = 20),
+        legend.key.height = unit(0.5, "inch"),
+        legend.key.width = unit(0.4, "inch"),
+        legend.position = c(0.8, 0.25),
+        legend.title = element_text(size = 24),
+        axis.text = element_text(size = 30, color = "black"),
+        axis.title = element_text(size = 25),
+        text = element_text(family = "Times")) 
+
+```
+
+
+Use rarefied data to calcualte Relative Abundances 
+
+
+```{r}
+
+
+count.table <- as.data.frame(count_table_diversity) %>% 
+  rownames_to_column(var = "sequence")
+  
+taxa.table <- as.data.frame(taxa_table_diversity) %>% 
+  rownames_to_column(var = "sequence")
+  
+
+
+seq_table_taxa_order <- merge(count.table, taxa.table, by = "sequence") %>% 
+  mutate(kpcofgs = paste(Kingdom,Phylum,Class,Order,  Family, Genus, Species, sep = "_")) %>% 
+  select(-c(sequence, Kingdom:Species)) %>% 
+  mutate(rown_num = seq(1:4355), kpcofgs_number = paste(kpcofgs, rown_num, sep = ";")) %>% 
+  column_to_rownames(var = "kpcofgs_number") %>% 
+  select(-c(kpcofgs, rown_num)) %>% 
+  mutate(total_counts = rowSums(.)) %>% 
+  filter(total_counts != 0)
+
+
+  
+asv_id <- seq_table_taxa_order %>%   
+  arrange(-total_counts) %>% 
+  rownames_to_column(var = "kpcofgs_number") %>% 
+  mutate(number = seq(1:2891), ASV = "ASV", asv_id = paste(ASV,number, sep = "")) %>% 
+  select(asv_id, kpcofgs_number)
+
+seq_table_taxa_order_1 <- seq_table_taxa_order %>% 
+  rownames_to_column(var = "kpcofgs_number")
+
+
+
+ASV_taxa_number_counts <- merge(seq_table_taxa_order_1, asv_id, by = "kpcofgs_number")
+  
+  
+ASV_taxa_number_RA <- ASV_taxa_number_counts %>%  
+  separate(kpcofgs_number, into = c("kpcofgs", "number"), sep = ";") %>% 
+  select(-c(total_counts, number)) %>% 
+  mutate(asv_rank_taxa = paste(asv_id,kpcofgs, sep = "_")) %>% 
+  column_to_rownames(var = "asv_rank_taxa") %>% 
+  select(-c(asv_id, kpcofgs)) %>% 
+  mutate(across(where(is.numeric), ~ ./sum(.)))
+  
+
+seq_table_taxa_RA_long <-as.data.frame(t(ASV_taxa_number_RA))
+
+seq_table_taxa_RA_long_filt <- seq_table_taxa_RA_long  %>% 
+  .[,colSums(.) >0]
+
+
+seq_table_taxa_RA_long_filt.df <- as.data.frame(seq_table_taxa_RA_long_filt)
+
+seq_table_taxa_RA_long_filt.df<- seq_table_taxa_RA_long_filt.df %>% 
+  rownames_to_column(var = "DNA_SampleID")
+
+
+MP_Biofilm_Samples_Diversity_RA <- merge(MP_biofilm_samples_richness, seq_table_taxa_RA_long_filt.df, by = "DNA_SampleID")
+
+write_csv(MP_Biofilm_Samples_Diversity_RA, )
+
+```
+
+
+
+# Plot Specific ASV's over time 
+
+```{r}
+
+
+MP_Biofilm_Samples_Diversity_RA %>% 
+  ggplot(aes(x = age_d, y = ASV10_Bacteria_Proteobacteria_Gammaproteobacteria_Granulosicoccales_Granulosicoccaceae_Granulosicoccus_NA)) +
+  geom_point(size = 5) +
+  geom_smooth(aes(color = season), size = 1, se = FALSE) +
+  theme(panel.grid.major = element_line(color = "grey", size = 0.5),
+        panel.grid.minor = element_line(color = "grey", size = 0.5),
+        strip.background = element_rect(fill = "white", color = "black", size = 1.5),
+        panel.background = element_rect(fill = "white", color = "black", size = 1.5),
+        strip.text.x = element_text(),
+        legend.key = element_rect(fill = "white"),
+        legend.title = element_text(size = ),
+        legend.text = element_text(size = 15),
+        strip.text = element_text(size = "20"),
+        axis.text = element_text(size = 15),
+        axis.title = element_text(size = 17),
+        text = element_text(family = "Times"))# +
+    labs(x = "ASV39_Verrucomicrobiales (% Relative Abundance)",
+       y = "Depth (m)") 
+
+
+
+
+
+
+
+```
+
+

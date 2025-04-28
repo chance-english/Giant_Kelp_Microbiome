@@ -1,0 +1,169 @@
+﻿date,time,bottle,timepoint,days,treatment,cells,amendment,control_live,cells_ml
+10/12/24,17:00,A,0,0,No Cells No Amendment,No,None,Control,385.6213575
+10/12/24,17:00,B,0,0,No Cells No Amendment,No,None,Control,857.7112702
+10/12/24,17:00,C,0,0,No Cells No Amendment,No,None,Control,625.8394606
+10/12/24,17:00,D,0,0,Cells No Amendment,Yes,None,Live,58137.30194
+10/12/24,17:00,E,0,0,Cells No Amendment,Yes,None,Live,50805.38426
+10/12/24,17:00,F,0,0,Cells No Amendment,Yes,None,Live,55911.36517
+10/12/24,17:00,G,0,0,No Cells NAGA,No,NAGA,Control,250.6404907
+10/12/24,17:00,H,0,0,No Cells NAGA,No,NAGA,Control,1180.333159
+10/12/24,17:00,I,0,0,No Cells NAGA,No,NAGA,Control,1722.05847
+10/12/24,17:00,J,0,0,No Cells Alginate,No,Alginate,Control,2799.967268
+10/12/24,17:00,K,0,0,No Cells Alginate,No,Alginate,Control,1543.288928
+10/12/24,17:00,L,0,0,No Cells Alginate,No,Alginate,Control,1138.911131
+10/12/24,17:00,M,0,0,No Cells Fucoidan,No,Fucoidan,Control,404.2046889
+10/12/24,17:00,N,0,0,No Cells Fucoidan,No,Fucoidan,Control,929.6698137
+10/12/24,17:00,O,0,0,No Cells Fucoidan,No,Fucoidan,Control,1083.270133
+10/12/24,17:00,P,0,0,Cells NAGA,Yes,NAGA,Live,64270.52876
+10/12/24,17:00,Q,0,0,Cells NAGA,Yes,NAGA,Live,66378.50566
+10/12/24,17:00,R,0,0,Cells NAGA,Yes,NAGA,Live,67874.62285
+10/12/24,17:00,S,0,0,Cells Alginate,Yes,Alginate,Live,61576.21232
+10/12/24,17:00,T,0,0,Cells Alginate,Yes,Alginate,Live,64638.53006
+10/12/24,17:00,U,0,0,Cells Alginate,Yes,Alginate,Live,59862.86807
+10/12/24,17:00,V,0,0,Cells Fucoidan,Yes,Fucoidan,Live,69018.2631
+10/12/24,17:00,W,0,0,Cells Fucoidan,Yes,Fucoidan,Live,67677.27759
+10/12/24,17:00,X,0,0,Cells Fucoidan,Yes,Fucoidan,Live,70485.97679
+10/13/24,14:00,A,1,0.875,No Cells No Amendment,No,None,Control,169.7914205
+10/13/24,14:00,B,1,0.875,No Cells No Amendment,No,None,Control,56.59521678
+10/13/24,14:00,C,1,0.875,No Cells No Amendment,No,None,Control,307.2361628
+10/13/24,14:00,D,1,0.875,Cells No Amendment,Yes,None,Live,29374.21812
+10/13/24,14:00,E,1,0.875,Cells No Amendment,Yes,None,Live,29725.16316
+10/13/24,14:00,F,1,0.875,Cells No Amendment,Yes,None,Live,28141.4772
+10/13/24,14:00,G,1,0.875,No Cells NAGA,No,NAGA,Control,226.3709373
+10/13/24,14:00,H,1,0.875,No Cells NAGA,No,NAGA,Control,274.8753296
+10/13/24,14:00,I,1,0.875,No Cells NAGA,No,NAGA,Control,202.1118748
+10/13/24,14:00,J,1,0.875,No Cells Alginate,No,Alginate,Control,437.917494
+10/13/24,14:00,K,1,0.875,No Cells Alginate,No,Alginate,Control,62.46672315
+10/13/24,14:00,L,1,0.875,No Cells Alginate,No,Alginate,Control,214.3130543
+10/13/24,14:00,M,1,0.875,No Cells Fucoidan,No,Fucoidan,Control,32.33651019
+10/13/24,14:00,N,1,0.875,No Cells Fucoidan,No,Fucoidan,Control,161.6827588
+10/13/24,14:00,O,1,0.875,No Cells Fucoidan,No,Fucoidan,Control,145.5153245
+10/13/24,14:00,P,1,0.875,Cells NAGA,Yes,NAGA,Live,41667.02042
+10/13/24,14:00,Q,1,0.875,Cells NAGA,Yes,NAGA,Live,62424.09666
+10/13/24,14:00,R,1,0.875,Cells NAGA,Yes,NAGA,Live,41797.30525
+10/13/24,14:00,S,1,0.875,Cells Alginate,Yes,Alginate,Live,42464.1975
+10/13/24,14:00,T,1,0.875,Cells Alginate,Yes,Alginate,Live,45693.05263
+10/13/24,14:00,U,1,0.875,Cells Alginate,Yes,Alginate,Live,45293.54676
+10/13/24,14:00,V,1,0.875,Cells Fucoidan,Yes,Fucoidan,Live,69338.94561
+10/13/24,14:00,W,1,0.875,Cells Fucoidan,Yes,Fucoidan,Live,77896.24437
+10/13/24,14:00,X,1,0.875,Cells Fucoidan,Yes,Fucoidan,Live,73358.96485
+10/14/24,11:00,A,2,1.75,No Cells No Amendment,No,None,Control,231.9383005
+10/14/24,11:00,B,2,1.75,No Cells No Amendment,No,None,Control,185.1218606
+10/14/24,11:00,C,2,1.75,No Cells No Amendment,No,None,Control,1164.22753
+10/14/24,11:00,D,2,1.75,Cells No Amendment,Yes,None,Live,19007.21047
+10/14/24,11:00,E,2,1.75,Cells No Amendment,Yes,None,Live,18887.80249
+10/14/24,11:00,F,2,1.75,Cells No Amendment,Yes,None,Live,15774.8889
+10/14/24,11:00,G,2,1.75,No Cells NAGA,No,NAGA,Control,687.1930716
+10/14/24,11:00,H,2,1.75,No Cells NAGA,No,NAGA,Control,509.3169329
+10/14/24,11:00,I,2,1.75,No Cells NAGA,No,NAGA,Control,590.1585674
+10/14/24,11:00,J,2,1.75,No Cells Alginate,No,Alginate,Control,1367.27931
+10/14/24,11:00,K,2,1.75,No Cells Alginate,No,Alginate,Control,449.5544578
+10/14/24,11:00,L,2,1.75,No Cells Alginate,No,Alginate,Control,1133.631741
+10/14/24,11:00,M,2,1.75,No Cells Fucoidan,No,Fucoidan,Control,28.63952954
+10/14/24,11:00,N,2,1.75,No Cells Fucoidan,No,Fucoidan,Control,113.176331
+10/14/24,11:00,O,2,1.75,No Cells Fucoidan,No,Fucoidan,Control,129.3476201
+10/14/24,11:00,P,2,1.75,Cells NAGA,Yes,NAGA,Live,51163.7487
+10/14/24,11:00,Q,2,1.75,Cells NAGA,Yes,NAGA,Live,95752.8553
+10/14/24,11:00,R,2,1.75,Cells NAGA,Yes,NAGA,Live,56165.83232
+10/14/24,11:00,S,2,1.75,Cells Alginate,Yes,Alginate,Live,39289.49035
+10/14/24,11:00,T,2,1.75,Cells Alginate,Yes,Alginate,Live,43165.86015
+10/14/24,11:00,U,2,1.75,Cells Alginate,Yes,Alginate,Live,47203.86946
+10/14/24,11:00,V,2,1.75,Cells Fucoidan,Yes,Fucoidan,Live,157670.6739
+10/14/24,11:00,W,2,1.75,Cells Fucoidan,Yes,Fucoidan,Live,128830.4988
+10/14/24,11:00,X,2,1.75,Cells Fucoidan,Yes,Fucoidan,Live,136804.0375
+10/15/24,12:00,A,3,2.791666667,No Cells No Amendment,No,None,Control,137.4392216
+10/15/24,12:00,B,3,2.791666667,No Cells No Amendment,No,None,Control,3937.070689
+10/15/24,12:00,C,3,2.791666667,No Cells No Amendment,No,None,Control,1107.544514
+10/15/24,12:00,D,3,2.791666667,Cells No Amendment,Yes,None,Live,13959.74169
+10/15/24,12:00,E,3,2.791666667,Cells No Amendment,Yes,None,Live,15781.01562
+10/15/24,12:00,F,3,2.791666667,Cells No Amendment,Yes,None,Live,15477.44743
+10/15/24,12:00,G,3,2.791666667,No Cells NAGA,No,NAGA,Control,3209.429058
+10/15/24,12:00,H,3,2.791666667,No Cells NAGA,No,NAGA,Control,2764.773176
+10/15/24,12:00,I,3,2.791666667,No Cells NAGA,No,NAGA,Control,1915.935612
+10/15/24,12:00,J,3,2.791666667,No Cells Alginate,No,Alginate,Control,2857.268061
+10/15/24,12:00,K,3,2.791666667,No Cells Alginate,No,Alginate,Control,2564.603669
+10/15/24,12:00,L,3,2.791666667,No Cells Alginate,No,Alginate,Control,4201.80569
+10/15/24,12:00,M,3,2.791666667,No Cells Fucoidan,No,Fucoidan,Control,420.3680476
+10/15/24,12:00,N,3,2.791666667,No Cells Fucoidan,No,Fucoidan,Control,679.0562405
+10/15/24,12:00,O,3,2.791666667,No Cells Fucoidan,No,Fucoidan,Control,695.226536
+10/15/24,12:00,P,3,2.791666667,Cells NAGA,Yes,NAGA,Live,87735.92184
+10/15/24,12:00,Q,3,2.791666667,Cells NAGA,Yes,NAGA,Live,191243.4041
+10/15/24,12:00,R,3,2.791666667,Cells NAGA,Yes,NAGA,Live,97652.41899
+10/15/24,12:00,S,3,2.791666667,Cells Alginate,Yes,Alginate,Live,35256.20568
+10/15/24,12:00,T,3,2.791666667,Cells Alginate,Yes,Alginate,Live,41936.22745
+10/15/24,12:00,U,3,2.791666667,Cells Alginate,Yes,Alginate,Live,48019.78402
+10/15/24,12:00,V,3,2.791666667,Cells Fucoidan,Yes,Fucoidan,Live,503209.1154
+10/15/24,12:00,W,3,2.791666667,Cells Fucoidan,Yes,Fucoidan,Live,331582.2159
+10/15/24,12:00,X,3,2.791666667,Cells Fucoidan,Yes,Fucoidan,Live,388455.2518
+10/16/24,12:00,A,4,3.791666667,No Cells No Amendment,No,None,Control,493.1876419
+10/16/24,12:00,B,4,3.791666667,No Cells No Amendment,No,None,Control,10227.16321
+10/16/24,12:00,C,4,3.791666667,No Cells No Amendment,No,None,Control,8634.061843
+10/16/24,12:00,D,4,3.791666667,Cells No Amendment,Yes,None,Live,20967.35136
+10/16/24,12:00,E,4,3.791666667,Cells No Amendment,Yes,None,Live,20461.64512
+10/16/24,12:00,F,4,3.791666667,Cells No Amendment,Yes,None,Live,40772.31655
+10/16/24,12:00,G,4,3.791666667,No Cells NAGA,No,NAGA,Control,35910.17631
+10/16/24,12:00,H,4,3.791666667,No Cells NAGA,No,NAGA,Control,20687.66296
+10/16/24,12:00,I,4,3.791666667,No Cells NAGA,No,NAGA,Control,23051.20947
+10/16/24,12:00,J,4,3.791666667,No Cells Alginate,No,Alginate,Control,6940.625071
+10/16/24,12:00,K,4,3.791666667,No Cells Alginate,No,Alginate,Control,4114.735943
+10/16/24,12:00,L,4,3.791666667,No Cells Alginate,No,Alginate,Control,1325.8878
+10/16/24,12:00,M,4,3.791666667,No Cells Fucoidan,No,Fucoidan,Control,14289.58173
+10/16/24,12:00,N,4,3.791666667,No Cells Fucoidan,No,Fucoidan,Control,2300.839236
+10/16/24,12:00,O,4,3.791666667,No Cells Fucoidan,No,Fucoidan,Control,9411.29537
+10/16/24,12:00,P,4,3.791666667,Cells NAGA,Yes,NAGA,Live,233810.045
+10/16/24,12:00,Q,4,3.791666667,Cells NAGA,Yes,NAGA,Live,494247.2927
+10/16/24,12:00,R,4,3.791666667,Cells NAGA,Yes,NAGA,Live,246613.1124
+10/16/24,12:00,S,4,3.791666667,Cells Alginate,Yes,Alginate,Live,40012.59605
+10/16/24,12:00,T,4,3.791666667,Cells Alginate,Yes,Alginate,Live,55007.52523
+10/16/24,12:00,U,4,3.791666667,Cells Alginate,Yes,Alginate,Live,60731.26707
+10/16/24,12:00,V,4,3.791666667,Cells Fucoidan,Yes,Fucoidan,Live,881353.2314
+10/16/24,12:00,W,4,3.791666667,Cells Fucoidan,Yes,Fucoidan,Live,595920.1057
+10/16/24,12:00,X,4,3.791666667,Cells Fucoidan,Yes,Fucoidan,Live,656277.6638
+10/17/24,12:00,A,5,4.791666667,No Cells No Amendment,No,None,Control,759.8946821
+10/17/24,12:00,B,5,4.791666667,No Cells No Amendment,No,None,Control,1123.676127
+10/17/24,12:00,C,5,4.791666667,No Cells No Amendment,No,None,Control,1826.981272
+10/17/24,12:00,D,5,4.791666667,Cells No Amendment,Yes,None,Live,7501.965505
+10/17/24,12:00,E,5,4.791666667,Cells No Amendment,Yes,None,Live,8617.598279
+10/17/24,12:00,F,5,4.791666667,Cells No Amendment,Yes,None,Live,6976.516328
+10/17/24,12:00,G,5,4.791666667,No Cells NAGA,No,NAGA,Control,4227.926026
+10/17/24,12:00,H,5,4.791666667,No Cells NAGA,No,NAGA,Control,3734.819824
+10/17/24,12:00,I,5,4.791666667,No Cells NAGA,No,NAGA,Control,3823.72844
+10/17/24,12:00,J,5,4.791666667,No Cells Alginate,No,Alginate,Control,2603.146994
+10/17/24,12:00,K,5,4.791666667,No Cells Alginate,No,Alginate,Control,3072.233772
+10/17/24,12:00,L,5,4.791666667,No Cells Alginate,No,Alginate,Control,1422.829879
+10/17/24,12:00,M,5,4.791666667,No Cells Fucoidan,No,Fucoidan,Control,978.1616749
+10/17/24,12:00,N,5,4.791666667,No Cells Fucoidan,No,Fucoidan,Control,1414.699592
+10/17/24,12:00,O,5,4.791666667,No Cells Fucoidan,No,Fucoidan,Control,2764.728979
+10/17/24,12:00,P,5,4.791666667,Cells NAGA,Yes,NAGA,Live,342724.3407
+10/17/24,12:00,Q,5,4.791666667,Cells NAGA,Yes,NAGA,Live,838582.4205
+10/17/24,12:00,R,5,4.791666667,Cells NAGA,Yes,NAGA,Live,399934.1737
+10/17/24,12:00,S,5,4.791666667,Cells Alginate,Yes,Alginate,Live,37858.60796
+10/17/24,12:00,T,5,4.791666667,Cells Alginate,Yes,Alginate,Live,39709.36849
+10/17/24,12:00,U,5,4.791666667,Cells Alginate,Yes,Alginate,Live,52175.85194
+10/17/24,12:00,V,5,4.791666667,Cells Fucoidan,Yes,Fucoidan,Live,826903.3081
+10/17/24,12:00,W,5,4.791666667,Cells Fucoidan,Yes,Fucoidan,Live,465774.6938
+10/17/24,12:00,X,5,4.791666667,Cells Fucoidan,Yes,Fucoidan,Live,508852.8524
+10/21/24,12:00,A,6,8.791666667,No Cells No Amendment,No,None,Control,215.0604312
+10/21/24,12:00,B,6,8.791666667,No Cells No Amendment,No,None,Control,582.092908
+10/21/24,12:00,C,6,8.791666667,No Cells No Amendment,No,None,Control,994.3790808
+10/21/24,12:00,D,6,8.791666667,Cells No Amendment,Yes,None,Live,4292.710694
+10/21/24,12:00,E,6,8.791666667,Cells No Amendment,Yes,None,Live,4510.94607
+10/21/24,12:00,F,6,8.791666667,Cells No Amendment,Yes,None,Live,3605.513356
+10/21/24,12:00,G,6,8.791666667,No Cells NAGA,No,NAGA,Control,848.8297104
+10/21/24,12:00,H,6,8.791666667,No Cells NAGA,No,NAGA,Control,1220.705123
+10/21/24,12:00,I,6,8.791666667,No Cells NAGA,No,NAGA,Control,784.1549548
+10/21/24,12:00,J,6,8.791666667,No Cells Alginate,No,Alginate,Control,1287.312791
+10/21/24,12:00,K,6,8.791666667,No Cells Alginate,No,Alginate,Control,1297.618477
+10/21/24,12:00,L,6,8.791666667,No Cells Alginate,No,Alginate,Control,928.1730595
+10/21/24,12:00,M,6,8.791666667,No Cells Fucoidan,No,Fucoidan,Control,145.5116307
+10/21/24,12:00,N,6,8.791666667,No Cells Fucoidan,No,Fucoidan,Control,476.9563222
+10/21/24,12:00,O,6,8.791666667,No Cells Fucoidan,No,Fucoidan,Control,1317.689821
+10/21/24,12:00,P,6,8.791666667,Cells NAGA,Yes,NAGA,Live,2177139.979
+10/21/24,12:00,Q,6,8.791666667,Cells NAGA,Yes,NAGA,Live,4322159.391
+10/21/24,12:00,R,6,8.791666667,Cells NAGA,Yes,NAGA,Live,2583731.879
+10/21/24,12:00,S,6,8.791666667,Cells Alginate,Yes,Alginate,Live,37733.6912
+10/21/24,12:00,T,6,8.791666667,Cells Alginate,Yes,Alginate,Live,36890.01103
+10/21/24,12:00,U,6,8.791666667,Cells Alginate,Yes,Alginate,Live,46936.40307
+10/21/24,12:00,V,6,8.791666667,Cells Fucoidan,Yes,Fucoidan,Live,761554.4477
+10/21/24,12:00,W,6,8.791666667,Cells Fucoidan,Yes,Fucoidan,Live,422971.7292
+10/21/24,12:00,X,6,8.791666667,Cells Fucoidan,Yes,Fucoidan,Live,431203.6656

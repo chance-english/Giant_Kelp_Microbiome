@@ -1,0 +1,86 @@
+---
+title: "Culture_Remin"
+author: "Chance English"
+date: "10/17/2024"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Load Data
+
+```{r}
+
+
+cell_counts <- read_csv(here("Outputdata", "241012_cell_counts.csv"))
+
+
+```
+
+```{r}
+
+culture_growth_curve <- cell_counts %>% 
+  filter(amendment != "NAGA") %>% 
+  group_by(timepoint, amendment, control_live, cells) %>% 
+  summarize(mean_cells = mean(cells_ml),
+            sd_cells = sd(cells_ml),
+            days = days) %>%  
+  ggplot(aes(x = days, y = mean_cells/1000000)) +
+  geom_point(aes(color = control_live, shape = amendment), size = 4) +
+  geom_errorbar(aes(ymin = mean_cells/1000000 - sd_cells/1000000, ymax = mean_cells/1000000 + sd_cells/1000000), width = 0) +
+  geom_line(aes(color = control_live, shape = amendment), orientation = "x") +
+  labs(x = "Days",
+       color = "",
+       shape = "") +
+  ylab(expression(Cell~Abundance~("10"^{"6"}~mL^{"-1"}))) +
+  scale_x_continuous(breaks = c(0,2,4,6,8,10)) +
+  scale_color_manual(values = c("red", "black")) +
+  theme(panel.background = element_rect(fill = "white", color = "black", size = 1.5),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        plot.margin = margin(1,1,1,1, "cm"),
+        strip.background = element_rect(fill = "white", color = "black"),
+        legend.key = element_rect(fill = "white"),
+        legend.text = element_text(size = 20),
+        legend.key.height = unit(0.3, "inch"),
+        legend.key.width = unit(0.2, "inch"),
+        legend.title = element_text(size = 24),
+        axis.text = element_text(size = 30, color = "black"),
+        axis.title = element_text(size = 25),
+        text = element_text(family = "Times")) 
+
+ggsave("culture_remin_cell_counts_noNAGA.tiff", plot = culture_growth_curve, path = "/Users/chanceenglish/Desktop/Lab Shiz/ARPA-e/Giant_Kelp_Microbiome/Figures/", width = 8, height = 6, device='tiff', dpi=100, units = "in")
+
+
+
+
+```
+
+# Positive Growth 
+
+```{r}
+
+
+cell_counts_T0_TF <- cell_counts %>% 
+  filter(timepoint %in% c(0,6)) %>% 
+  mutate(treatment_timepoint = paste(treatment, timepoint, sep = "_"))
+
+
+cell_growth_aov <- aov(cells_ml ~ treatment_timepoint, data = cell_counts_T0_TF)
+
+cell_growth_aov
+summary(cell_growth_aov)
+
+TukeyHSD(cell_growth_aov)
+```
+
+
+
+```{r}
+
+
+
+```
+

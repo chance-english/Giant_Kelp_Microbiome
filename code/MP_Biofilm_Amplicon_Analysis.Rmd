@@ -1,0 +1,1973 @@
+---
+title: "MP_Biofilm_Amplicon_Analysis"
+author: "Chance English"
+date: "9/16/2024"
+output: html_document
+---
+
+```{r setup, include=FALSE, message=FALSE, echo=FALSE, warning=FALSE}
+knitr::opts_chunk$set(message = FALSE, echo = FALSE, warning = FALSE)
+```
+
+
+```{r,include=FALSE, message=FALSE, echo=FALSE, warning=FALSE}
+
+library(tidyverse)
+library(dada2)
+library(ShortRead)
+library(beepr)
+library(phyloseq)
+library(ggplot2)
+library(dplyr)
+library(RColorBrewer)
+library(tidyverse)
+library(here)
+library(ggpubr)
+library(janitor)
+library(ggsci)
+library(lubridate)
+library(readxl)
+library(growthcurver)
+library(zoo)
+library(scales)
+library(kableExtra)
+library(broom)
+library(reshape2)
+library(vegan)
+library(indicspecies)
+library(readr)
+library(ggrepel)
+library(DESeq2)
+
+#library(cowplot)
+
+```
+
+
+
+# Load in sequence table with taxa 
+
+
+
+```{r, include=FALSE, message=FALSE, echo=FALSE, warning=FALSE}
+
+# Load Sequence table with sequences for rownames and sample ID for column names. Populated with read number
+
+seq_table <- read_rds("/Users/chanceenglish/Desktop/Lab Shiz/ARPA-e/Giant_Kelp_Microbiome/Outputdata/seqtable_nochim.rds")
+
+sample_data <- read_rds(as.matrix("/Users/chanceenglish/Desktop/Lab Shiz/ARPA-e/Giant_Kelp_Microbiome/Outputdata/sample.data.rds", header = T, row.names = F, check.names = F))
+
+
+count_table <- read_csv(as.matrix("/Users/chanceenglish/Desktop/Lab Shiz/ARPA-e/Giant_Kelp_Microbiome/Outputdata/seqtab_nochim_taxa.csv", header = T, row.names = 1, check.names = F))
+
+
+sampletable_df_nmds <- read_csv(here("Inputdata", "sampledata", "MP_Biofilm_Samples_Metadata.csv"))
+
+
+
+```
+
+# Subset count table 
+
+```{r}
+
+# Select samples for MP Biofilm, filter out Mitochondria, chloroplast, Eukaryotas
+
+count_table_subset_mx <- count_table %>% 
+  select(MP_230809_B1_S1: MP_240616_B6_S54, Kingdom:Species) %>% 
+  filter(Family != "Mitochondria" & Order != "Chloroplast" & Kingdom != "Eukaryota") %>% 
+  filter(rowSums(across(where(is.numeric)))!=0) 
+  
+
+
+count_table_subset <- as.data.frame(count_table_subset_mx)
+
+
+
+
+
+
+
+count_table_subset$c_o_f <- do.call(paste, c(count_table_subset[c("Class", "Order", "Family")], sep="_"))
+
+count_table_subset$k_p <- do.call(paste, c(count_table_subset[c("Kingdom", "Phylum")], sep="_"))
+
+count_table_subset$k_p_c <- do.call(paste, c(count_table_subset[c("Kingdom", "Phylum", "Class")], sep="_"))
+
+count_table_subset$k_p_c_o_f_g_s <- do.call(paste, c(count_table_subset[c("Kingdom", "Phylum", "Class","Order", "Family","Genus", "Species")], sep="_"))
+
+count_table_subset$taxa.ids <- ifelse(count_table_subset$c_o_f == "NA_NA_NA", count_table_subset$k_p, count_table_subset$c_o_f)
+
+count_table_subset_ids <- count_table_subset %>% 
+  select(c(Kingdom:taxa.ids)) 
+
+count_table_subset_8000 <- count_table_subset %>% 
+  select(-c(Kingdom:taxa.ids)) %>% 
+   .[,colSums(.) >8000]
+  
+
+count_table_subset <- cbind(count_table_subset_8000, count_table_subset_ids)
+
+count_table_subset_nosingle_doubles <- count_table_subset  %>% 
+  filter(rowSums(across(where(is.numeric)))>2) 
+
+# Singletons removes = 4355 - 3391 =  
+
+```
+
+
+# Aggregate by Family 
+
+
+```{r}
+
+
+agg_by_fam <- aggregate(count_table_subset_nosingle_doubles[,1:54], 
+                        by = list(count_table_subset_nosingle_doubles$taxa.ids), 
+                        FUN = sum)
+
+
+
+```
+
+
+# Aggregate by class
+
+```{r}
+
+
+agg_by_class <- aggregate(count_table_subset_nosingle_doubles[,1:54], 
+                        by = list(count_table_subset_nosingle_doubles$k_p_c), 
+                        FUN = sum)
+
+
+```
+
+
+# Agregate by Phylumn
+
+
+```{r}
+
+
+agg_by_phylum <- aggregate(count_table_subset_nosingle_doubles[,1:54], 
+                        by = list(count_table_subset_nosingle_doubles$k_p), 
+                        FUN = sum)
+
+
+
+```
+
+# Agregate by ASV
+
+
+```{r}
+
+
+agg_by_ASV <- aggregate(count_table_subset_nosingle_doubles[,1:54], 
+                        by = list(count_table_subset_nosingle_doubles$k_p_c_o_f_g_s), 
+                        FUN = sum)
+
+
+
+
+```
+
+
+
+
+
+# Calculate relative abundances by ASV
+
+```{r}
+
+# Count table with ASV's removing chloroplast, mitocondria and eukaryotes
+
+count_table_subset_asv <- count_table_subset_nosingle_doubles %>% 
+  filter(Family != "Mitochondria" & Order != "Chloroplast" & Kingdom != "Eukaryota") %>% 
+  select(-c(Kingdom, Phylum, Class, Order, Family, Genus, Species, c_o_f, k_p, k_p_c, taxa.ids))
+
+# Save Count table w/ ASV name as a csv
+
+write_csv(count_table_subset_asv, "/Users/chanceenglish/Desktop/Lab Shiz/ARPA-e/Giant_Kelp_Microbiome/Outputdata/count_table_subset_asv_forDEseq.csv")
+
+
+# Calculate relative abundances 
+
+numbers <- 1:5000
+
+count_table_asv_RA <- as.data.frame(lapply(count_table_subset_asv[1:54], function(x) {(x/ sum(x))}))
+
+count_table_asv_RA_asv <- cbind(count_table_subset_asv[55], count_table_asv_RA) #%>% 
+  column_to_rownames(var = "k_p_c_o_f_g_s")
+
+# Give ASV's unique identifiers and remove ASV's with no hits
+  
+count_table_asv_RA_asv_unique  <- count_table_asv_RA_asv %>%
+  group_by(k_p_c_o_f_g_s) %>%
+  mutate(k_p_c_o_f_g_s_unique = if (n() > 1) paste(k_p_c_o_f_g_s, numbers[row_number()], sep = "_") else as.character(k_p_c_o_f_g_s)) %>%
+  ungroup() %>% 
+   select(-k_p_c_o_f_g_s) %>% 
+  remove_rownames() %>% 
+  column_to_rownames(var = "k_p_c_o_f_g_s_unique") 
+
+count_table_asv_RA_asv_unique_long <- count_table_asv_RA_asv_unique %>% 
+  t()
+
+
+
+write_csv(as.data.frame(count_table_asv_RA_asv_unique_long),"/Users/chanceenglish/Desktop/Lab Shiz/ARPA-e/Giant_Kelp_Microbiome/Outputdata/count_table_asv_RA_asv_unique_long.csv")
+
+
+
+```
+
+
+# Calculate RA by Family 
+
+
+```{r}
+
+
+# 1. Calculate relative abundance:
+
+
+
+family_RA <-  as.data.frame(lapply(agg_by_fam[2:length(agg_by_fam)], function(x) {(x/ sum(x))}))
+
+# 2. Combine taxa IDs and relative abundance:
+
+family_RA_w_taxa <- cbind(agg_by_fam[1], family_RA) %>% 
+  remove_rownames %>%
+  column_to_rownames(var = "Group.1") %>% 
+   filter(rowSums(across(where(is.numeric)))!=0)
+
+
+  
+
+# 3. Transpose:
+
+family_RA_taxa_tr <- data.frame(t(family_RA_w_taxa))
+
+
+
+
+
+
+write_csv(family_RA_taxa_tr, "/Users/chanceenglish/Desktop/Lab Shiz/ARPA-e/Giant_Kelp_Microbiome/Outputdata/family_RA_taxa_tr.csv")
+
+
+
+family_RA_taxa_tr_for_sample_merger <- family_RA_taxa_tr %>% 
+  rownames_to_column(var = "DNA_SampleID")
+
+family_RA_w_metadata <- merge(sampletable_df_nmds, family_RA_taxa_tr_for_sample_merger, by = "DNA_SampleID")
+
+family_RA_w_metadata <- family_RA_w_metadata %>% 
+    mutate(phys_state = case_when(
+    age_d < 50 ~ "Mature",
+    age_d >= 50 ~ "Senescent"
+  ))
+
+family_RA_w_metadata %>% 
+  filter(age_d == 16) %>% 
+  group_by(phys_state, season) %>% 
+  summarise(mean_Pirellula = mean(Planctomycetes_Pirellulales_Pirellulaceae),
+            sd_Pirellula = sd(Planctomycetes_Pirellulales_Pirellulaceae))
+
+abundant_family_RA 
+
+
+
+```
+
+# Stats: Planctomycetes_Pirellulales_Pirellulaceae RA between Spring and Summer at 16 days of age
+
+```{r}
+
+pirellula_16d <- family_RA_w_metadata %>% 
+  filter(age_d == 16)
+
+t.test(pirellula_16d$Planctomycetes_Pirellulales_Pirellulaceae[pirellula_16d$season == "Summer"],
+            pirellula_16d$Planctomycetes_Pirellulales_Pirellulaceae[pirellula_16d$season == "Spring"],
+            alternative = "less") #p = 0.03728, significant 
+
+
+
+
+```
+
+
+
+
+# Plot Major Families RA over time : Boxplots 
+
+
+```{r}
+
+
+pirellulales_16d_family <- family_RA_w_metadata %>% 
+  ggplot(aes(x = age_d, y = Planctomycetes_Pirellulales_Pirellulaceae *100, fill = season)) +
+  geom_boxplot() +
+  labs(x = "Age (d)",
+       y = "Family Pirellulaceae (RA %)",
+       fill = "") +
+  scale_fill_manual(values = c("red", "black")) +
+  theme(panel.background = element_rect(fill = "white", color = "black", size = 1.5),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        plot.margin = margin(1,1,1,1, "cm"),
+        strip.background = element_rect(fill = "white", color = "black"),
+        legend.key = element_rect(fill = "white"),
+        legend.text = element_text(size = 20),
+        legend.key.height = unit(0.5, "inch"),
+        legend.key.width = unit(0.4, "inch"),
+        legend.title = element_text(size = 24),
+        axis.text = element_text(size = 30, color = "black"),
+        axis.title = element_text(size = 25),
+        text = element_text(family = "Times")) 
+
+
+granuloss_family_16days <- family_RA_w_metadata %>% 
+  filter(age_d == 16) %>% 
+  ggplot(aes(x = season, y = Gammaproteobacteria_Granulosicoccales_Granulosicoccaceae *100, fill = season)) +
+  geom_boxplot() +
+  labs(x = "Age (d)",
+       y = "Family Granulosicoccaceae (RA %)",
+       fill = "") +
+  scale_fill_manual(values = c("red", "black")) +
+  theme(panel.background = element_rect(fill = "white", color = "black", size = 1.5),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        plot.margin = margin(1,1,1,1, "cm"),
+        strip.background = element_rect(fill = "white", color = "black"),
+        legend.key = element_rect(fill = "white"),
+        legend.text = element_text(size = 20),
+        legend.key.height = unit(0.5, "inch"),
+        legend.key.width = unit(0.4, "inch"),
+        legend.title = element_text(size = 24),
+        axis.text = element_text(size = 30, color = "black"),
+        axis.title = element_text(size = 25),
+        text = element_text(family = "Times")) 
+
+
+
+flavobacteria_16d_fmaily <- family_RA_w_metadata %>% 
+  filter(age_d == 16) %>% 
+  ggplot(aes(x = season, y = Bacteroidia_Flavobacteriales_Flavobacteriaceae*100, fill = season)) +
+  geom_boxplot() +
+  labs(x = "Age (d)",
+       y = "Family Flavobacteriaceae (RA %)",
+       fill = "") +
+  scale_fill_manual(values = c("red", "black")) +
+  theme(panel.background = element_rect(fill = "white", color = "black", size = 1.5),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        plot.margin = margin(1,1,1,1, "cm"),
+        strip.background = element_rect(fill = "white", color = "black"),
+        legend.key = element_rect(fill = "white"),
+        legend.text = element_text(size = 20),
+        legend.key.height = unit(0.5, "inch"),
+        legend.key.width = unit(0.4, "inch"),
+        legend.title = element_text(size = 24),
+        axis.text = element_text(size = 30, color = "black"),
+        axis.title = element_text(size = 25),
+        text = element_text(family = "Times")) 
+
+
+```
+
+
+
+```{r}
+
+
+family_RA_taxa_tr_for_sample_merger <- family_RA_taxa_tr %>% 
+  rownames_to_column(var = "DNA_SampleID")
+
+family_RA_w_metadata <- merge(sampletable_df_nmds, family_RA_taxa_tr_for_sample_merger, by = "DNA_SampleID")
+
+
+
+Pirellulaceae_family_p <- family_RA_w_metadata %>% 
+  group_by(age_d, season) %>% 
+  summarise(mean_RA = mean(Planctomycetes_Pirellulales_Pirellulaceae)*100,
+            sd_RA = sd(Planctomycetes_Pirellulales_Pirellulaceae)*100) %>% 
+  ggplot(aes(x = age_d, y = mean_RA, color = season)) +
+  geom_point(size = 7) + 
+  geom_line(aes(color = season)) +
+  geom_errorbar(aes(ymin = mean_RA - sd_RA, ymax = mean_RA + sd_RA, width = 0)) +
+  labs(x = "Age (d)",
+       y = "Family Pirellulaceae (RA %)",
+       color = "") +
+  scale_y_continuous(breaks = c(0,10,20,30), limits = c(0,30)) +
+  scale_color_manual(values = c("red", "black")) +
+  theme(panel.background = element_rect(fill = "white", color = "black", size = 1.5),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        plot.margin = margin(1,1,1,1, "cm"),
+        strip.background = element_rect(fill = "white", color = "black"),
+        legend.key = element_rect(fill = "white"),
+        legend.text = element_text(size = 20),
+        legend.key.height = unit(0.5, "inch"),
+        legend.key.width = unit(0.4, "inch"),
+        legend.title = element_text(size = 24),
+        axis.text = element_text(size = 30, color = "black"),
+        axis.title = element_text(size = 25),
+        text = element_text(family = "Times")) 
+
+
+Granulosicoccaceae_family_p <- family_RA_w_metadata %>% 
+  group_by(age_d, season) %>% 
+  summarise(mean_RA = mean(Gammaproteobacteria_Granulosicoccales_Granulosicoccaceae)*100,
+            sd_RA = sd(Gammaproteobacteria_Granulosicoccales_Granulosicoccaceae)*100) %>% 
+  ggplot(aes(x = age_d, y = mean_RA, color = season)) +
+  geom_point(size = 7) + 
+  geom_line(aes(color = season)) +
+  geom_errorbar(aes(ymin = mean_RA - sd_RA, ymax = mean_RA + sd_RA, width = 0)) +
+  labs(x = "Age (d)",
+       y = "Family Granulosicoccaceae (RA %)",
+       color = "") +
+  scale_y_continuous(breaks = c(0,25,50,75,100), limits = c(0,75)) +
+  scale_color_manual(values = c("red", "black")) +
+  theme(panel.background = element_rect(fill = "white", color = "black", size = 1.5),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        plot.margin = margin(1,1,1,1, "cm"),
+        strip.background = element_rect(fill = "white", color = "black"),
+        legend.key = element_rect(fill = "white"),
+        legend.text = element_text(size = 20),
+        legend.key.height = unit(0.5, "inch"),
+        legend.key.width = unit(0.4, "inch"),
+        legend.title = element_text(size = 24),
+        axis.text = element_text(size = 30, color = "black"),
+        axis.title = element_text(size = 25),
+        text = element_text(family = "Times")) 
+
+
+Thiotrichaceae_family_boxplot <- family_RA_w_metadata %>% 
+  mutate(age_d = as.factor(age_d)) %>% 
+  ggplot(aes(x = age_d, y = Gammaproteobacteria_Thiotrichales_Thiotrichaceae *100, fill = season)) +
+  geom_boxplot() +
+  labs(x = "Age (d)",
+       y = "Family Thiotrichaceae (RA %)",
+       fill = "") +
+  scale_color_manual(values = c("red", "black")) +
+  theme(panel.background = element_rect(fill = "white", color = "black", size = 1.5),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        plot.margin = margin(1,1,1,1, "cm"),
+        strip.background = element_rect(fill = "white", color = "black"),
+        legend.key = element_rect(fill = "white"),
+        legend.text = element_text(size = 20),
+        legend.key.height = unit(0.5, "inch"),
+        legend.key.width = unit(0.4, "inch"),
+        legend.title = element_text(size = 24),
+        axis.text = element_text(size = 30, color = "black"),
+        axis.title = element_text(size = 25),
+        text = element_text(family = "Times")) 
+
+Flavobacteriaceae_family_p <- family_RA_w_metadata %>% 
+  group_by(age_d, season) %>% 
+  summarise(mean_RA = mean(Bacteroidia_Flavobacteriales_Flavobacteriaceae)*100,
+            sd_RA = sd(Bacteroidia_Flavobacteriales_Flavobacteriaceae)*100) %>% 
+  ggplot(aes(x = age_d, y = mean_RA, color = season)) +
+  geom_point(size = 7) + 
+  geom_line(aes(color = season)) +
+  geom_errorbar(aes(ymin = mean_RA - sd_RA, ymax = mean_RA + sd_RA, width = 0)) +
+  labs(x = "Age (d)",
+       y = "Family Flavobacteriaceae (RA %)",
+       color = "") +
+  scale_y_continuous(breaks = c(0,5,10,15,20), limits = c(0,20)) +
+  scale_color_manual(values = c("red", "black")) +
+  theme(panel.background = element_rect(fill = "white", color = "black", size = 1.5),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        plot.margin = margin(1,1,1,1, "cm"),
+        strip.background = element_rect(fill = "white", color = "black"),
+        legend.key = element_rect(fill = "white"),
+        legend.text = element_text(size = 20),
+        legend.key.height = unit(0.5, "inch"),
+        legend.key.width = unit(0.4, "inch"),
+        legend.title = element_text(size = 24),
+        axis.text = element_text(size = 30, color = "black"),
+        axis.title = element_text(size = 25),
+        text = element_text(family = "Times")) 
+
+
+Flavobacteriaceae_family_boxplot <- family_RA_w_metadata %>% 
+  mutate(age_d = as.factor(age_d)) %>% 
+  ggplot(aes(x = age_d, y = Bacteroidia_Flavobacteriales_Flavobacteriaceae *100, fill = season)) +
+  geom_boxplot() +
+  labs(x = "Age (d)",
+       y = "Family Flavobacteriaceae (RA %)",
+       fill = "") +
+  scale_fill_manual(values = c("red", "black")) +
+  theme(panel.background = element_rect(fill = "white", color = "black", size = 1.5),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        plot.margin = margin(1,1,1,1, "cm"),
+        strip.background = element_rect(fill = "white", color = "black"),
+        legend.key = element_rect(fill = "white"),
+        legend.text = element_text(size = 20),
+        legend.key.height = unit(0.5, "inch"),
+        legend.key.width = unit(0.4, "inch"),
+        legend.title = element_text(size = 24),
+        axis.text = element_text(size = 30, color = "black"),
+        axis.title = element_text(size = 25),
+        text = element_text(family = "Times")) 
+
+
+Microtrichaceae_family_boxplot <- family_RA_w_metadata %>% 
+  mutate(age_d = as.factor(age_d)) %>% 
+  ggplot(aes(x = age_d, y = Acidimicrobiia_Microtrichales_Microtrichaceae *100, fill = season)) +
+  geom_boxplot() +
+  labs(x = "Age (d)",
+       y = "Family Microtrichaceae (RA %)",
+       fill = "") +
+  scale_fill_manual(values = c("red", "black")) +
+  theme(panel.background = element_rect(fill = "white", color = "black", size = 1.5),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        plot.margin = margin(1,1,1,1, "cm"),
+        strip.background = element_rect(fill = "white", color = "black"),
+        legend.key = element_rect(fill = "white"),
+        legend.text = element_text(size = 20),
+        legend.key.height = unit(0.5, "inch"),
+        legend.key.width = unit(0.4, "inch"),
+        legend.title = element_text(size = 24),
+        axis.text = element_text(size = 30, color = "black"),
+        axis.title = element_text(size = 25),
+        text = element_text(family = "Times")) 
+
+
+
+Trueperaceae_family_boxplot <- family_RA_w_metadata %>% 
+  mutate(age_d = as.factor(age_d)) %>% 
+  ggplot(aes(x = age_d, y = Deinococci_Deinococcales_Trueperaceae *100, fill = season)) +
+  geom_boxplot() +
+  labs(x = "Age (d)",
+       y = "Family Trueperaceae (RA %)",
+       fill = "") +
+  scale_fill_manual(values = c("red", "black")) +
+  theme(panel.background = element_rect(fill = "white", color = "black", size = 1.5),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        plot.margin = margin(1,1,1,1, "cm"),
+        strip.background = element_rect(fill = "white", color = "black"),
+        legend.key = element_rect(fill = "white"),
+        legend.text = element_text(size = 20),
+        legend.key.height = unit(0.5, "inch"),
+        legend.key.width = unit(0.4, "inch"),
+        legend.title = element_text(size = 24),
+        axis.text = element_text(size = 30, color = "black"),
+        axis.title = element_text(size = 25),
+        text = element_text(family = "Times")) 
+
+
+
+
+
+
+
+
+
+
+
+```
+
+# Planctomycetes Pirellulales Family Mature vs. Senescent 
+
+
+```{r}
+
+pirellulales_family_sum <- family_RA_w_metadata %>% 
+  select(age_d, season, Planctomycetes_Pirellulales_Pirellulaceae) %>% 
+  mutate(phys_state = case_when(
+    age_d < 50 ~ "Mature",
+    age_d > 50 ~ "Senescent"
+  )) 
+
+boxplot_pirellulalaceae_phys_state <-  pirellulales_family_sum %>% 
+  ggplot() +
+  geom_boxplot(aes(x = phys_state, y = Planctomycetes_Pirellulales_Pirellulaceae*100, fill = phys_state)) +
+  geom_jitter(aes(x = phys_state, y = Planctomycetes_Pirellulales_Pirellulaceae*100), width = 0.1) +
+  labs(x = "",
+       y = "Family Pirellulaceae (RA %)",
+       fill = "") +
+  scale_y_continuous(breaks = c(0,10,20,30), limits = c(0,30)) +
+  scale_fill_manual(values = c("#034A85", "#9D3709"  )) +
+  theme(panel.background = element_rect(fill = "white", color = "black", size = 1.5),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        plot.margin = margin(1,1,1,1, "cm"),
+        strip.background = element_rect(fill = "white", color = "black"),
+        legend.key = element_rect(fill = "white"),
+        legend.text = element_text(size = 20),
+        legend.position = "none",
+        legend.key.height = unit(0.5, "inch"),
+        legend.key.width = unit(0.4, "inch"),
+        legend.title = element_text(size = 24),
+        axis.text = element_text(size = 30, color = "black"),
+        axis.title = element_text(size = 25),
+        text = element_text(family = "Times")) 
+
+
+
+# Two Sample t-test: C:N content of mature kelp in Spring vs. Summer
+
+
+## Test for Normality
+
+
+with(pirellulales_family_sum, shapiro.test(Planctomycetes_Pirellulales_Pirellulaceae[phys_state== "Mature"])) # p = 0.77 = normal
+
+
+with(pirellulales_family_sum, shapiro.test(Planctomycetes_Pirellulales_Pirellulaceae[phys_state== "Senescent"])) # p = 0.2042 = normal
+
+## Equal Variances 
+
+pirellulaes.ftest <- var.test(Planctomycetes_Pirellulales_Pirellulaceae ~ phys_state, data = pirellulales_family_sum)
+
+pirellulaes.ftest  # Variances are equal. Use two sample t.test
+
+
+
+
+pirellulales_t.test <- t.test(Planctomycetes_Pirellulales_Pirellulaceae ~ phys_state, data = pirellulales_family_sum, alternative = "greater")
+
+
+pirellulales_t.test # p = 4.455e-05, df = 51.056, t = 4.2559
+
+# Mean mature RA = 17.3%
+# Mean senescent RA = 10.1%
+ 
+# Relative abundance of Pirellulales family on mature kelp blades is significantly greater for mature blades than senescent blades
+
+
+
+```
+
+# Subset to 10 Families and Compare RA between Mature and Senescent Populations 
+
+
+```{r}
+
+
+family_RA_phys_long_top_families <- family_RA_w_metadata %>% 
+  select(-c(DNA_SampleID:season, Chl_C)) %>% 
+  melt(id = c("blade", "age_d")) %>% 
+  arrange(desc(value)) %>% 
+  filter(value > 0.01) %>% 
+  mutate(phys_state = case_when(
+    age_d < 50 ~ "Mature",
+    age_d >= 50 ~ "Senescent"
+  )) 
+
+
+
+family_RA_phys_long_top_families_top10 <- family_RA_phys_long_top_families %>% 
+  filter(variable %in% c("Gammaproteobacteria_Granulosicoccales_Granulosicoccaceae", "Planctomycetes_Pirellulales_Pirellulaceae", "Gammaproteobacteria_Thiotrichales_Thiotrichaceae", "Bacteroidia_Flavobacteriales_Flavobacteriaceae", "Bacteroidia_Chitinophagales_Saprospiraceae", "Acidimicrobiia_Microtrichales_Microtrichaceae", "Alphaproteobacteria_Caulobacterales_Hyphomonadaceae", "Gammaproteobacteria_Arenicellales_Arenicellaceae", "Alphaproteobacteria_Rhodobacterales_Rhodobacteraceae", "Gammaproteobacteria_Pseudomonadales_Cellvibrionaceae")) %>% 
+  separate(variable, "_", into = c("phylum", "order","family")) %>% 
+  mutate(RA = as.numeric(value)) %>%
+  select(-value)
+
+
+
+
+top10_families_plot <- family_RA_phys_long_top_families_top10 %>% 
+  ggplot() +
+  geom_boxplot(aes(y = reorder(family, RA), x = RA*100, fill = phys_state)) +
+  scale_fill_manual(values = c("#266A25","#BD9C3D")) +
+  labs(y = "",
+       x = "Relative Abundance (%)",
+       fill = "") +
+  theme(panel.background = element_rect(fill = "white", color = "black", size = 1.5),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        plot.margin = margin(1,1,1,1, "cm"),
+        strip.background = element_rect(fill = "white", color = "black"),
+        legend.key = element_rect(fill = "white"),
+        legend.text = element_text(size = 20),
+        legend.key.height = unit(0.5, "inch"),
+        legend.position = "top",
+        legend.key.width = unit(0.4, "inch"),
+        legend.title = element_text(size = 24),
+        axis.text = element_text(size = 20, color = "black"),
+        axis.title = element_text(size = 24),
+        text = element_text(family = "Times")) 
+
+
+
+```
+
+# Subset to 10 Families and Compare RA between Seasons
+
+```{r}
+
+
+family_RA_phys_long_top_families_season <- family_RA_w_metadata %>% 
+  select(-c(DNA_SampleID:sample_date, Chl_C, phys_state)) %>% 
+  melt(id = c("blade", "season")) %>% 
+  arrange(desc(value)) %>% 
+  filter(value > 0.01)
+
+
+
+family_RA_phys_long_top_families_top10_season <- family_RA_phys_long_top_families_season %>% 
+  filter(variable %in% c("Gammaproteobacteria_Granulosicoccales_Granulosicoccaceae", "Planctomycetes_Pirellulales_Pirellulaceae", "Gammaproteobacteria_Thiotrichales_Thiotrichaceae", "Bacteroidia_Flavobacteriales_Flavobacteriaceae", "Bacteroidia_Chitinophagales_Saprospiraceae", "Acidimicrobiia_Microtrichales_Microtrichaceae", "Alphaproteobacteria_Caulobacterales_Hyphomonadaceae", "Gammaproteobacteria_Arenicellales_Arenicellaceae", "Alphaproteobacteria_Rhodobacterales_Rhodobacteraceae", "Gammaproteobacteria_Pseudomonadales_Cellvibrionaceae")) %>% 
+  separate(variable, "_", into = c("phylum", "order","family")) %>% 
+  mutate(RA = as.numeric(value)) %>%
+  select(-value)
+
+
+
+
+top10_families_plot_season <- family_RA_phys_long_top_families_top10_season %>% 
+  ggplot() +
+  geom_boxplot(aes(y = reorder(family, RA), x = RA*100, fill = season)) +
+  scale_fill_manual(values = c("blue","red")) +
+  labs(y = "",
+       x = "Relative Abundance (%)",
+       fill = "") +
+  theme(panel.background = element_rect(fill = "white", color = "black", size = 1.5),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        plot.margin = margin(1,1,1,1, "cm"),
+        strip.background = element_rect(fill = "white", color = "black"),
+        legend.key = element_rect(fill = "white"),
+        legend.text = element_text(size = 20),
+        legend.key.height = unit(0.5, "inch"),
+        legend.position = "top",
+        legend.key.width = unit(0.4, "inch"),
+        legend.title = element_text(size = 24),
+        axis.text = element_text(size = 20, color = "black"),
+        axis.title = element_text(size = 24),
+        text = element_text(family = "Times")) 
+
+
+
+```
+
+# Calculate RA by Class 
+
+
+
+```{r}
+
+
+# 1. Calculate relative abundance:
+
+class_RA <-  as.data.frame(lapply(agg_by_class[2:length(agg_by_class)], function(x) {(x/ sum(x))}))
+
+# 2. Combine taxa IDs and relative abundance:
+
+class_RA_w_taxa <- cbind(agg_by_class[1], class_RA) %>% 
+  remove_rownames %>%
+  column_to_rownames(var = "Group.1")
+
+# 3. Transpose:
+
+class_RA_taxa_tr <- data.frame(t(class_RA_w_taxa))
+
+
+
+write_csv(class_RA_taxa_tr, "/Users/chanceenglish/Desktop/Lab Shiz/ARPA-e/Giant_Kelp_Microbiome/Outputdata/class_RA_taxa_tr.csv")
+
+
+
+
+
+```
+
+
+# Calculate RA by Phylum 
+
+
+
+```{r}
+
+
+# 1. Calculate relative abundance:
+
+phylum_RA <-  as.data.frame(lapply(agg_by_phylum[2:length(agg_by_phylum)], function(x) {(x/ sum(x))}))
+
+# 2. Combine taxa IDs and relative abundance:
+
+phylum_RA_w_taxa <- cbind(agg_by_phylum[1], phylum_RA) %>% 
+  remove_rownames %>%
+  column_to_rownames(var = "Group.1")
+
+# 3. Transpose:
+
+phylum_RA_w_taxa_tr <- data.frame(t(phylum_RA_w_taxa))
+
+
+
+write_csv(phylum_RA_w_taxa_tr, "/Users/chanceenglish/Desktop/Lab Shiz/ARPA-e/Giant_Kelp_Microbiome/Outputdata/phylum_RA_taxa_tr.csv")
+
+
+phylum_RA_taxa_tr_for_sample_merger <- phylum_RA_w_taxa_tr %>% 
+  rownames_to_column(var = "DNA_SampleID")
+
+phylum_RA_w_metadata <- merge(sampletable_df_nmds, phylum_RA_taxa_tr_for_sample_merger, by = "DNA_SampleID")
+
+phylum_RA_w_metadata <- phylum_RA_w_metadata %>% 
+    mutate(phys_state = case_when(
+    age_d < 50 ~ "Mature",
+    age_d >= 50 ~ "Senescent"
+  ))
+
+
+Phylum_summary_dominant <- phylum_RA_w_metadata %>% 
+  summarize(mean_Bacteroides = mean(Bacteria_Bacteroidota),
+            sd_Bacteroides = sd(Bacteria_Bacteroidota),
+            mean_Proteobacteira = mean(Bacteria_Proteobacteria),
+            sd_Proteobacteria = sd(Bacteria_Proteobacteria),
+            mean_Planctomycetes = mean(Bacteria_Planctomycetota),
+            sd_Planctomycetes = sd(Bacteria_Planctomycetota),
+            mean_Verrucomicrobia = mean(Bacteria_Verrucomicrobiota),
+            sd_Verrucomicrobia = sd(Bacteria_Verrucomicrobiota))
+
+Phylum_summary_phys <- phylum_RA_w_metadata %>% 
+  group_by(phys_state) %>% 
+  summarize(mean_Bacteroides = mean(Bacteria_Bacteroidota),
+            sd_Bacteroides = sd(Bacteria_Bacteroidota),
+            mean_Proteobacteira = mean(Bacteria_Proteobacteria),
+            sd_Proteobacteria = sd(Bacteria_Proteobacteria),
+            mean_Planctomycetes = mean(Bacteria_Planctomycetota),
+            sd_Planctomycetes = sd(Bacteria_Planctomycetota),
+            mean_Verrucomicrobia = mean(Bacteria_Verrucomicrobiota),
+            sd_Verrucomicrobia = sd(Bacteria_Verrucomicrobiota))
+
+Phylum_summary_season <- phylum_RA_w_metadata %>% 
+  group_by(season) %>% 
+  summarize(mean_Bacteroides = mean(Bacteria_Bacteroidota),
+            sd_Bacteroides = sd(Bacteria_Bacteroidota),
+            mean_Proteobacteira = mean(Bacteria_Proteobacteria),
+            sd_Proteobacteria = sd(Bacteria_Proteobacteria),
+            mean_Planctomycetes = mean(Bacteria_Planctomycetota),
+            sd_Planctomycetes = sd(Bacteria_Planctomycetota),
+            mean_Verrucomicrobia = mean(Bacteria_Verrucomicrobiota),
+            sd_Verrucomicrobia = sd(Bacteria_Verrucomicrobiota))
+
+```
+
+# Transform RA data: Arcsine transformation ASV Level
+
+
+```{r}
+
+
+
+ASV_RA_asv_transformed <- asin(sqrt(count_table_asv_RA_asv_unique))
+
+# colnames(ASV_RA_asv_transformed) <- paste("asinsqrt", colnames(ASV_RA_asv_transformed), sep = "_")
+
+ASV_RA_asv_transformed_tposed <- data.frame(t(ASV_RA_asv_transformed))
+
+write_csv(ASV_RA_asv_transformed_tposed, "/Users/chanceenglish/Desktop/Lab Shiz/ARPA-e/Giant_Kelp_Microbiome/Outputdata/ASV_RA_asv_transformed_tposed.csv")
+
+ASV_RA_asv_transformed_tposed <- read_csv("/Users/chanceenglish/Desktop/Lab Shiz/ARPA-e/Giant_Kelp_Microbiome/Outputdata/ASV_RA_asv_transformed_tposed.csv")
+
+```
+
+
+
+# Transform RA data: Arcsine transformation Family Level
+
+
+
+```{r}
+
+
+
+family_RA_asv_transformed <- asin(sqrt(family_RA))
+
+family_RA_asv_transformed_taxa <- cbind(agg_by_fam[1], family_RA_asv_transformed) %>% 
+  remove_rownames %>% 
+  column_to_rownames(var = "Group.1")
+
+family_RA_asv_transformed_taxa_tposed <- data.frame(t(family_RA_asv_transformed_taxa))
+
+write_csv(family_RA_asv_transformed_taxa_tposed, "/Users/chanceenglish/Desktop/Lab Shiz/ARPA-e/Giant_Kelp_Microbiome/Outputdata/family_RA_asv_transformed_taxa_tposed.csv")
+
+```
+
+
+# Transform RA data: Arcsine transformation Class Level
+
+
+
+```{r}
+
+class_RA_asv_transformed <- asin(sqrt(class_RA))
+
+class_RA_asv_transformed_taxa <- cbind(agg_by_class[1], class_RA_asv_transformed) %>% 
+  remove_rownames %>% 
+  column_to_rownames(var = "Group.1")
+
+
+class_RA_asv_transformed_taxa_tposed <- data.frame(t(class_RA_asv_transformed_taxa))
+
+write_csv(class_RA_asv_transformed_taxa_tposed, "/Users/chanceenglish/Desktop/Lab Shiz/ARPA-e/Giant_Kelp_Microbiome/Outputdata/class_RA_asv_transformed_taxa_tposed.csv")
+
+```
+
+
+# NMDS : ASV's: No singeltons or doublets 
+
+
+
+```{r}
+
+# Create a matrix of the Arcsine square root transformed RA 
+
+com <- ASV_RA_asv_transformed_tposed[,1:ncol(ASV_RA_asv_transformed_tposed)]
+
+m_com <- as.matrix(com)
+
+# Calculate NMDS scores based on bray curtis dissimilarity 
+
+nmds = metaMDS(m_com, dsitance = "bray")
+
+data.scores = as.data.frame(scores(nmds)) %>% 
+  rownames_to_column(var = "DNA_SampleID")
+
+
+```
+
+
+# Merge NMDS Scores with Sample Metadata
+
+
+```{r}
+
+
+sampletable_df_nmds <- read_csv(here("Inputdata", "sampledata", "MP_Biofilm_Samples_Metadata.csv"))
+
+
+MP_Biofilm_Sample_Data_NMDS <- merge(sampletable_df_nmds, data.scores, by = "DNA_SampleID")
+
+# Save NMDS and metadata merged file as a csv
+
+write_csv(MP_Biofilm_Sample_Data_NMDS, "/Users/chanceenglish/Desktop/Lab Shiz/ARPA-e/Giant_Kelp_Microbiome/Outputdata/MP_Biofilm_Sample_Data_NMDS_scores.csv")
+
+# Load NMDS metadata merged file as a csv 
+
+MP_Biofilm_Sample_Data_NMDS <- read_csv("/Users/chanceenglish/Desktop/Lab Shiz/ARPA-e/Giant_Kelp_Microbiome/Outputdata/MP_Biofilm_Sample_Data_NMDS_scores.csv")
+
+# Plot results of community composition across potential density 
+
+NMDS_p_biofilm <- MP_Biofilm_Sample_Data_NMDS %>% 
+  ggplot(aes(x = NMDS1, y = NMDS2, color = phys_state, shape = season)) +
+  geom_point(size = 7) +
+  scale_color_manual(values = c("#266A25","#BD9C3D")) +
+  labs(color = "",
+       shape = "") +
+  theme(panel.background = element_rect(fill = "white", color = "black", size = 1.5),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        plot.margin = margin(1,1,1,1, "cm"),
+        strip.background = element_rect(fill = "white", color = "black"),
+        legend.position = "none",
+        legend.key = element_rect(fill = "white"),
+        legend.text = element_text(size = 20),
+        legend.key.height = unit(0.5, "inch"),
+        legend.key.width = unit(0.4, "inch"),
+        legend.title = element_text(size = 24),
+        axis.text = element_text(size = 30, color = "black"),
+        axis.title = element_text(size = 25),
+        text = element_text(family = "Times")) 
+
+
+
+# scico::scale_color_scico(palette = "vik", breaks = c(1, 15,30,45,60,75, 90)) +
+
+```
+
+
+# Stats: PERMANOVA on Betadiversity between seasons and physiological state
+
+
+```{r}
+
+sampletable_df <- MP_Biofilm_Sample_Data_NMDS %>% 
+  mutate(phys_state = case_when(
+    age_d <50 ~ "Mature",
+    age_d >=50 ~ "Senescent"
+  )) %>% 
+  select(DNA_SampleID,
+         blade,
+         season,
+         age_d,
+         phys_state,
+         tissue_CN
+         )
+
+
+# PERMANOCVA community composition. Is there a significant difference in ASV relative abundance between mature and senescent kelp controlling for season (strata)? 
+
+MP_Biofilm_ASB_adonis_phys_state <- adonis(ASV_RA_asv_transformed_tposed~phys_state, data = sampletable_df, method = "bray", strata = sampletable_df$season)
+
+
+MP_Biofilm_ASB_adonis_phys_state # R2 = 0.18 p < 0.001 ***
+
+
+
+# PERMANOCVA community composition. Is there a significant difference in ASV relative abundance between seasons controlling for phys_state (strata)? 
+
+MP_Biofilm_ASB_adonis_season <- adonis(ASV_RA_asv_transformed_tposed~season, data = sampletable_df, method = "bray", strata = sampletable_df$phys_state)
+
+MP_Biofilm_ASB_adonis_season # R2 = 0.26 P < 0.001 ***
+
+
+# PERMANOCVA community composition. Is there a significant difference in ASV relative abundance between seasons. Just mature kelp. 
+
+sampletable_df_mature <- sampletable_df %>% 
+  filter(phys_state == "Mature")
+
+mature_rows <- c(1:18, 31:42)
+
+ASV_RA_asv_transformed_tposed_mature <- ASV_RA_asv_transformed_tposed[mature_rows, ]
+
+MP_Biofilm_ASB_adonis_mature_season <- adonis(ASV_RA_asv_transformed_tposed_mature~season, data = sampletable_df_mature, method = "bray")
+
+MP_Biofilm_ASB_adonis_mature_season
+
+
+# PERMANOVA Season * Phys State 
+
+# PERMANOCVA community composition. Is there a significant difference in ASV relative abundance between mature and senescent kelp controlling for season (strata)? 
+
+MP_Biofilm_ASB_adonis_phys_state_seasons <- adonis(ASV_RA_asv_transformed_tposed~phys_state*season, data = sampletable_df, method = "bray")
+
+
+MP_Biofilm_ASB_adonis_phys_state_seasons # R2 = 0.1 p < 0.001 ***
+
+
+```
+
+
+# Create Phyloseq Object 
+
+
+```{r}
+
+# Load counts table for MP Biofilm Samples and Remove ASV's that are not present 
+
+count.table.dirty <- readRDS("/Users/chanceenglish/Desktop/Lab Shiz/ARPA-e/Giant_Kelp_Microbiome/Outputdata/seqtable_nochim.rds")
+
+count.table.df <- as.data.frame(count.table.dirty)
+
+count.table.df_subset <- count.table.df %>% 
+  select(MP_230809_B1_S1:MP_240616_B6_S54) %>% 
+  filter(rowSums(across(where(is.numeric)))>10) 
+  
+count.table <- as.matrix(count.table.df_subset)
+
+
+taxa.table <- readRDS("/Users/chanceenglish/Desktop/Lab Shiz/ARPA-e/Giant_Kelp_Microbiome/Outputdata/taxa.rds")
+
+sample.table <- readRDS("/Users/chanceenglish/Desktop/Lab Shiz/ARPA-e/Giant_Kelp_Microbiome/Outputdata/sample.data.rds") %>% 
+  drop_na(DNA_SampleID) %>% 
+  column_to_rownames(var = "DNA_SampleID")
+
+
+OTU = otu_table(count.table, taxa_are_rows = TRUE)
+TAX = tax_table(taxa.table)
+SAM = sample_data(sample.table)
+
+ps = phyloseq(OTU, TAX, SAM)
+
+
+ps_sub <- ps %>% 
+  subset_taxa(Family != "Mitochondria", Class != "Chloroplast")
+
+
+
+```
+
+
+# DEseq2 : Physiological State 
+
+
+```{r}
+
+dd_phys_state <- phyloseq_to_deseq2(ps_sub, ~phys_state)
+
+dd_phys_state$phys_state <- factor(dd_phys_state$phys_state, levels = c("Mature", "Senescent"))
+
+
+dd_phys_state <- DESeq(dd_phys_state, test = "Wald", sfType = "poscounts")
+
+resultsNames(dd_phys_state)
+
+
+res = results(dd_phys_state, cooksCutoff = FALSE)
+alpha = 0.01
+sigtab = res[which(res$padj < alpha), ]
+sigtab = cbind(as(sigtab, "data.frame"), as(tax_table(ps_sub)[rownames(sigtab), ], "matrix"))
+
+head(sigtab)
+
+dim(sigtab)
+
+
+# Save Deseq2 Results for Dev Stage 
+
+write_csv(sigtab, "/Users/chanceenglish/Desktop/Lab Shiz/ARPA-e/Giant_Kelp_Microbiome/Outputdata/Deseq2_sigtab_dev_stage.csv")
+
+# 
+
+sigtab_dev <- sigtab %>% 
+  rownames_to_column(var = "sequence")
+
+# Phylum order
+x = tapply(sigtab$log2FoldChange, sigtab$Phylum, function(x) max(x))
+x = sort(x, TRUE)
+sigtab$Phylum = factor(as.character(sigtab$Phylum), levels=names(x))
+# Genus order
+x = tapply(sigtab$log2FoldChange, sigtab$Genus, function(x) max(x))
+x = sort(x, TRUE)
+sigtab$Genus = factor(as.character(sigtab$Genus), levels=names(x))
+
+ggplot(sigtab, aes(x=Genus, y=log2FoldChange, color=Phylum)) + geom_point(size=6) + 
+  theme(axis.text.x = element_text(angle = -90, hjust = 0, vjust=0.5))
+
+# Pull out sequences of ASVs that have a significant difference between Phys States 
+
+sigtab_phys_state_sequences <- sigtab %>% 
+  rownames_to_column(var = "sequence")
+
+sigtab_phys_state_sequence_list <- sigtab_phys_state_sequences$sequence
+
+
+
+
+```
+
+
+DEseq2: Season 
+
+
+```{r}
+
+dd_season <- phyloseq_to_deseq2(ps_sub, ~season)
+
+dd_season$season <- factor(dd_season$season, levels = c("Summer", "Spring"))
+
+
+dd_season <- DESeq(dd_season, test = "Wald", sfType = "poscounts")
+
+resultsNames(dd_season)
+
+
+res_season = results(dd_season, cooksCutoff = FALSE)
+
+alpha = 0.01
+
+sigtab_season = res_season[which(res_season$padj < alpha), ]
+
+sigtab_season = cbind(as(sigtab_season, "data.frame"), as(tax_table(ps_sub)[rownames(sigtab_season), ], "matrix"))
+head(sigtab)
+
+dim(sigtab_season)
+
+# Save Deseq2 Results for Seasons 
+
+write_csv(sigtab_season, "/Users/chanceenglish/Desktop/Lab Shiz/ARPA-e/Giant_Kelp_Microbiome/Outputdata/Deseq2_sigtab_season.csv")
+
+#
+
+sigtab_season_rownames <- sigtab_season %>% 
+  rownames_to_column(var = "sequence")
+
+x = tapply(sigtab_season$log2FoldChange, sigtab_season$Phylum, function(x) max(x))
+x = sort(x, TRUE)
+sigtab_season$Phylum = factor(as.character(sigtab_season$Phylum), levels=names(x))
+# Genus order
+x = tapply(sigtab_season$log2FoldChange, sigtab_season$Genus, function(x) max(x))
+x = sort(x, TRUE)
+sigtab_season$Genus = factor(as.character(sigtab_season$Genus), levels=names(x))
+
+ggplot(sigtab_season, aes(x=Genus, y=log2FoldChange, color=Phylum)) + geom_point(size=6) + 
+  theme(axis.text.x = element_text(angle = -90, hjust = 0, vjust=0.5))
+
+
+# Pull out sequences of ASVs that have a significant difference between Summer and Spring 
+
+sigtab_season_sequences <- sigtab_season %>% 
+  rownames_to_column(var = "sequence")
+
+sigtab_season_sequence_list <- sigtab_season_sequences$sequence
+
+
+
+
+```
+
+# Merge Deseq2 Tables for Both
+
+```{r}
+
+sig_table_dev_season <- merge(sigtab_dev, sigtab_season_rownames, by = "sequence")
+
+
+write_csv(sig_table_dev_season, "/Users/chanceenglish/Desktop/Lab Shiz/ARPA-e/Giant_Kelp_Microbiome/Outputdata/Deseq2_sigtab_season_dev_combined.csv")
+
+```
+
+
+# Significant Sequences 
+
+```{r}
+
+sig_sequences <- unique(c(sigtab_phys_state_sequence_list, sigtab_season_sequence_list))
+
+sig
+
+```
+
+
+# Filter ASVs to contain only those with signifcant differences between season and/or physiological state
+
+
+```{r}
+
+# Select Raw Counts from MP Biofilm Sampling and remove ASV singletons and doublets
+
+count_table_MP_Biofilm <- count_table %>% 
+  select(sequence, MP_230809_B1_S1:MP_240616_B6_S54, Kingdom:Species) %>% 
+  filter(Family != "Mitochondria", Class != "Chloroplast") %>% 
+  filter(rowSums(across(where(is.numeric)))>2) 
+
+# Extract sequences and taxonomy, rename sequence column to Column
+
+MP_Biofilm_sequences_taxa <- count_table_MP_Biofilm %>% 
+  select(sequence, Kingdom:Species) %>% 
+  mutate(Sequence = sequence) %>% 
+  select(-sequence)
+
+
+
+numeric_rows <- sapply(count_table_MP_Biofilm, is.numeric)
+
+# Calculate RA's of Taxa
+
+count_table_MP_Biofilm_RA <- as.data.frame(lapply(count_table_MP_Biofilm[2:55], function(x) {(x/ sum(x))}))
+
+rownames(count_table_MP_Biofilm_RA) <- count_table_MP_Biofilm$sequence
+
+# Filter out Amplicons that had a significant difference between mature, senescent kelp or between Summer and Spring 
+
+count.table.df_subset_w_Sequences <- count_table_MP_Biofilm_RA %>% 
+  rownames_to_column(var = "Sequence") %>% 
+  filter(Sequence %in% c(sig_sequences)) 
+
+
+# Merge Significant taxa RA dataframe with the Sequence and Taxonomy dataframes
+
+
+sig_taxa_RA <- merge(count.table.df_subset_w_Sequences, MP_Biofilm_sequences_taxa, by = "Sequence")  
+
+
+
+# Create Unique Taxa IDs
+
+numbers_sig_taxa <- 1:500
+
+
+sig_taxa_RA$f_g_s <- do.call(paste, c(sig_taxa_RA[c( "Family","Genus", "Species")], sep="_"))
+
+
+
+# Give ASV's unique identifiers and remove ASV's with no hits
+  
+sig_taxa_RA_unique  <- sig_taxa_RA %>%
+  group_by(f_g_s) %>%
+  mutate(f_g_s_unique = if (n() > 1) paste(f_g_s, numbers_sig_taxa[row_number()], sep = "_") else as.character(f_g_s)) %>%
+  ungroup() %>% 
+   select(-c(f_g_s, Sequence, Kingdom:Species)) %>% 
+  remove_rownames() %>% 
+  column_to_rownames(var = "f_g_s_unique") %>% 
+  t()
+
+sig_taxa_RA_df <- as.data.frame(sig_taxa_RA_unique)
+
+# Find ASVs with greater than 1% RA in at least 6 the  54 samples
+
+sig_taxa_RA_df_majority <- sig_taxa_RA_df %>% 
+  keep(~ (sum(. >= 0.01) / length(.)) > 0.111)
+
+
+
+
+```
+
+
+
+
+# Load in Sugar Mol% Data 
+
+
+```{r}
+
+sugars <- read_csv(here("Outputdata", "MP_DOM_sugar.csv"))
+
+
+
+sugars_subset <- sugars %>% 
+  select(DNA_SampleID, Fucose:`Man-URA`) %>% 
+  column_to_rownames(var = "DNA_SampleID")
+
+
+
+
+```
+
+
+# Correlation Matrix 
+
+## First Subset DNA Samples with Sugar Composition
+
+
+```{r}
+
+colors =  c("#034A85", "#9D3709")
+
+sugar_rows <- c(1:36, 49:54)
+
+
+sig_taxa_RA_df_majority_4sugars <- sig_taxa_RA_df_majority[sugar_rows,]
+
+
+
+sugars_sigASV_cor <- cor(sig_taxa_RA_df_majority_4sugars, sugars_subset, method = "spearman")
+
+sugars_sigASV_cor <- as.data.frame(sugars_sigASV_cor)
+
+# Filter to only include ASVs with at least one Spearman's correlation coefficeint >0.5
+
+sugars_sigASV_cor_R250 <- sugars_sigASV_cor %>% 
+  filter_all(any_vars(abs(.) >= 0.5))
+
+
+
+# Move rownames to column to save dataframe as a .csv 
+
+sugars_sigASV_cor_R250_csv <- sugars_sigASV_cor_R250 %>% 
+  rownames_to_column(var = "ASV_unique")
+
+
+write_csv(sugars_sigASV_cor_R250_csv, "/Users/chanceenglish/Desktop/Lab Shiz/ARPA-e/Giant_Kelp_Microbiome/Outputdata/sugars_sigASV_cor_R250_csv.csv")
+
+
+```
+
+
+## Create dataframe for ASV Phylumn Characterization for heatmap 
+
+
+```{r}
+
+# Contains fgs grouping and phylumn name
+
+sig_taxa_RA_phylum  <- sig_taxa_RA %>%
+  group_by(f_g_s) %>%
+  mutate(f_g_s_unique = if (n() > 1) paste(f_g_s, numbers_sig_taxa[row_number()], sep = "_") else as.character(f_g_s)) %>%
+  ungroup() %>% 
+  select(Phylum, f_g_s_unique)
+
+
+f_g_s_df <- sugars_sigASV_cor_R250 %>% 
+  rownames_to_column(var = "f_g_s_unique") %>% 
+  select(f_g_s_unique)
+
+
+sig_taxa_RA_phylum_majority <- sig_taxa_RA_phylum %>% 
+  filter(f_g_s_unique %in% c(f_g_s_df$f_g_s_unique)) %>% 
+  column_to_rownames(var = "f_g_s_unique")
+
+sig_taxa_RA_phylum_majority_csv <- sig_taxa_RA_phylum_majority %>% 
+  rownames_to_column(var = "ASV_unique")
+
+# Save significant ASVs with Spearman's R2 >0.5 with at least one sugar as cvs
+
+write_csv(sig_taxa_RA_phylum_majority_csv, "/Users/chanceenglish/Desktop/Lab Shiz/ARPA-e/Giant_Kelp_Microbiome/Outputdata/sig_taxa_RA_phylum_majority_csv.csv")
+
+
+```
+
+
+## Create heat map of significant ASV's vs. Mol% of Sugars released by giant kelp
+
+
+```{r}
+
+library(ggcorrplot)
+library(pheatmap)
+
+ann_colors = list(
+    Phylum = c("cornflowerblue","orange","red2","forestgreen","mediumorchid1"))
+
+sugars_ASV_corr_plot <- pheatmap(sugars_sigASV_cor_R250,
+         annotation_row = sig_taxa_RA_phylum_majority,
+         annotation_names_row = F, 
+         fontsize_row = 15, 
+         fontsize_col = 15,
+         angle_col = 45,
+         fontfamily = "Times",
+         color = c("#001260", "#011A66", "#01226B" ,"#012A70", "#023275", "#023A7B", "#034280", "#034A85", "#05538A","#0A5C90", "#136697",
+                  "#1E6F9D", "#2B79A4", "#3A84AB", "#4A8FB2", "#5A9ABA", "#6AA4C1", "#7BAEC8", "#8CB9CF", "#9CC3D5", "#ADCDDD", "#BDD6E3",
+                  "#CDDFE7", "#DDE5E8", "#E7E7E5", "#EEE2DB", "#EEDACE", "#EBD0C1", "#E7C6B2", "#E3BCA5", "#DEB197", "#DAA78A", "#D69E7C",
+                  "#D29470", "#CE8B64", "#C98157", "#C5784B", "#C26E3F", "#BE6533", "#B85C28", "#B1501C", "#A84411", "#9D3709", "#912D05",
+                  "#872406", "#7D1C06", "#731405", "#6A0D06", "#620606", "#590007"))
+
+
+
+```
+
+
+# Create Plot of RA for major ASV that line up with the heatmap 
+
+
+```{r}
+
+sig_taxa_RA_df_majority_4sugars_long <- sig_taxa_RA_df_majority_4sugars %>% 
+  remove_rownames() %>% 
+  pivot_longer(
+    cols = Rubinisphaeraceae_NA_NA_1:Granulosicoccaceae_Granulosicoccus_NA_14,
+    names_to = "ASV",
+    values_to = "RA") %>% 
+  filter(ASV != "NA")
+
+
+
+sig_ASV_RA_summary <- sig_taxa_RA_df_majority_4sugars_long %>% 
+  filter(ASV != "NA") %>% 
+  group_by(ASV) %>% 
+  summarize(meanRA = mean(RA),
+            sd_RA = sd(RA),
+            minRA = min(RA),
+            maxRA = max(RA))
+
+# Significant ASVs written to CSV 
+
+write_csv(sig_ASV_RA_summary, "/Users/chanceenglish/Desktop/Lab Shiz/ARPA-e/Giant_Kelp_Microbiome/Outputdata/sig_ASV_RA_summary.csv")
+
+
+sig_taxa_RA_df_majority_4sugars_long$ASV <- factor(sig_taxa_RA_df_majority_4sugars_long$ASV,
+                                                   levels = 
+                                                     c("Pirellulaceae_Blastopirellula_NA_12",
+           "Pirellulaceae_Blastopirellula_NA_7",
+           "Granulosicoccaceae_Granulosicoccus_NA_11",
+           "Pirellulaceae_Blastopirellula_NA_11",
+           "Granulosicoccaceae_Granulosicoccus_NA_6",
+           "Saprospiraceae_Portibacter_NA_5",
+           "Thiotrichaceae_Leucothrix_NA_8",
+           "Microtrichaceae_Sva0996 marine group_NA_8",
+          "Trueperaceae_Truepera_NA_1",
+          "Microtrichaceae_Sva0996 marine group_NA_1",
+          "Cellvibrionaceae_NA_NA_6",
+          "Flavobacteriaceae_Ulvibacter_NA_2",
+          "Granulosicoccaceae_Granulosicoccus_NA_8",
+          "Arenicellaceae_Arenicella_NA_6",
+          "Arenicellaceae_Arenicella_NA_3",
+          "Flavobacteriaceae_Algitalea_NA",
+          "Microtrichaceae_Sva0996 marine group_NA_7"))
+
+# Levels for Only ASV with a significant correlation to a sugar
+
+sig_ASV_R250_levels= c("Pirellulaceae_Blastopirellula_NA_12",
+           "Pirellulaceae_Blastopirellula_NA_7",
+           "Granulosicoccaceae_Granulosicoccus_NA_11",
+           "Pirellulaceae_Blastopirellula_NA_11",
+           "Granulosicoccaceae_Granulosicoccus_NA_6",
+           "Saprospiraceae_Portibacter_NA_5",
+           "Thiotrichaceae_Leucothrix_NA_8",
+           "Microtrichaceae_Sva0996 marine group_NA_8",
+          "Trueperaceae_Truepera_NA_1",
+          "Microtrichaceae_Sva0996 marine group_NA_1",
+          "Cellvibrionaceae_NA_NA_6",
+          "Flavobacteriaceae_Ulvibacter_NA_2",
+          "Granulosicoccaceae_Granulosicoccus_NA_8",
+          "Arenicellaceae_Arenicella_NA_6",
+          "Arenicellaceae_Arenicella_NA_3",
+          "Flavobacteriaceae_Algitalea_NA",
+          "Microtrichaceae_Sva0996 marine group_NA_7")
+
+
+# Levels for all significant abundant ASVs
+
+sig_ASV_levels = rev(c("Saprospiraceae_NA_NA_34",
+         "Pirellulaceae_Rubripirellula_NA_3",
+         "Pirellulaceae_Blastopirellula_NA_5",
+         "Saprospiraceae_Portibacter_NA_5",
+         "Granulosicoccaceae_Granulosicoccus_NA_10",
+         "Saprospiraceae_NA_NA_22",
+         "Granulosicoccaceae_Granulosicoccus_NA_14",
+         "Pirellulaceae_Blastopirellula_NA_1",
+         "Granulosicoccaceae_Granulosicoccus_NA_13",
+         "Granulosicoccaceae_Granulosicoccus_NA_6",
+         "Hyphomonadaceae_Litorimonas_NA_2",
+         "Microtrichaceae_Sva0996 marine group_NA_2",
+         "Thiotrichaceae_Cocleimonas_NA_7",
+         "Pirellulaceae_Blastopirellula_NA_11",
+         "Granulosicoccaceae_Granulosicoccus_NA_11",
+         "Pirellulaceae_Blastopirellula_NA_7",
+         "Pirellulaceae_Blastopirellula_NA_12",
+         "Granulosicoccaceae_Granulosicoccus_NA_8",
+         "Flavobacteriaceae_Ulvibacter_NA_2",
+         "Cellvibrionaceae_NA_NA_6",
+         "Microtrichaceae_Sva0996 marine group_NA_1",
+         "Trueperaceae_Truepera_NA_1",
+         "Microtrichaceae_Sva0996 marine group_NA_8",
+         "Thiotrichaceae_Leucothrix_NA_8",
+         "Microtrichaceae_Sva0996 marine group_NA_7",
+         "Flavobacteriaceae_Algitalea_NA",
+         "Arenicellaceae_Arenicella_NA_3",
+         "Arenicellaceae_Arenicella_NA_6",
+         "Arenicellaceae_Arenicella_NA_8",
+         "Granulosicoccaceae_Granulosicoccus_NA_2",
+         "Granulosicoccaceae_Granulosicoccus_NA_4",
+         "Thiotrichaceae_Cocleimonas_NA_4",
+         "Colwelliaceae_Thalassotalea_NA_2",
+         "Rubinisphaeraceae_NA_NA_2",
+         "KI89A clade_NA_NA",
+         "Saprospiraceae_NA_NA_21",
+         "Granulosicoccaceae_Granulosicoccus_NA_7",
+         "Rubinisphaeraceae_NA_NA_3",
+         "Microtrichaceae_Sva0996 marine group_NA_6",
+         "Microtrichaceae_Sva0996 marine group_NA_3",
+         "Saprospiraceae_NA_NA_32",
+         "Pirellulaceae_Blastopirellula_NA_2",
+         "Rubinisphaeraceae_NA_NA_1",
+         "Hyphomonadaceae_Hellea_NA_1"
+         ))
+
+
+
+
+RA_sigtaxat_p <- sig_taxa_RA_df_majority_4sugars_long %>% 
+  filter(ASV != "NA") %>% 
+  ggplot(aes(x = RA*100, y = ASV)) + 
+  geom_point() +
+  labs(y = "",
+       x = "Relative Abundance (%)") +
+  scale_x_log10(breaks = c(0.01,0.1,1,10,60)) +
+   theme(panel.background = element_rect(fill = "white", color = "black", size = 1.5),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        plot.margin = margin(1,1,1,1, "cm"),
+        strip.background = element_rect(fill = "white", color = "black"),
+        legend.key = element_rect(fill = "white"),
+        legend.text = element_text(size = 20),
+        legend.key.height = unit(0.5, "inch"),
+        legend.key.width = unit(0.4, "inch"),
+        legend.title = element_text(size = 24),
+        axis.text.y = element_blank(),
+        axis.text = element_text(size = 15, color = "black"),
+        axis.title = element_text(size = 20),
+        text = element_text(family = "Times")) 
+  
+
+
+combined_p <- plot_grid(sugars_ASV_corr_plot, RA_sigtaxat_p)
+
+```
+
+
+# Merge Sugar df and Sig ASV Dataset from Deseq2 for correlation analysis. Create a dataframe of Spearman correlation coefficients and p-values for ASVs with a significant relationship between a sugar  
+
+
+```{r}
+library(lattice)
+library(latticeExtra)
+library(Hmisc)
+
+sugars_subset_2 <- sugars_subset %>% 
+  rownames_to_column(var = "DNA_SampleID")
+
+sig_taxa_RA_df_majority_4sugars_2 <- sig_taxa_RA_df_majority_4sugars %>% 
+  rownames_to_column(var = "DNA_SampleID")
+
+sugar_ASV <- merge(sugars_subset_2, sig_taxa_RA_df_majority_4sugars_2, by = "DNA_SampleID")
+
+sugar_ASV <- sugar_ASV %>% 
+  column_to_rownames(var = "DNA_SampleID") %>% 
+  as.matrix()
+
+
+rcorr_res <- rcorr(sugar_ASV, type = "spearman")
+
+rcorr_res
+
+rcorr_r2 <- as.data.frame(rcorr_res$r)
+
+rcorr_r2_ASV_Sugar <- rcorr_r2[1:9, 10:53]
+
+rcorr_p <- as.data.frame(rcorr_res$P)
+
+rcorr_P_ASV_Sugar <- rcorr_p[1:9, 10:53]
+
+rcorr_p_sigASV <- rcorr_P_ASV_Sugar %>% 
+  select(Pirellulaceae_Blastopirellula_NA_12 ,
+           Pirellulaceae_Blastopirellula_NA_7,
+           Granulosicoccaceae_Granulosicoccus_NA_11,
+           Pirellulaceae_Blastopirellula_NA_11,
+           Granulosicoccaceae_Granulosicoccus_NA_6,
+           Saprospiraceae_Portibacter_NA_5,
+           Thiotrichaceae_Leucothrix_NA_8,
+         `Microtrichaceae_Sva0996 marine group_NA_8`,
+          Trueperaceae_Truepera_NA_1,
+          `Microtrichaceae_Sva0996 marine group_NA_1`,
+          Cellvibrionaceae_NA_NA_6,
+          Flavobacteriaceae_Ulvibacter_NA_2,
+          Granulosicoccaceae_Granulosicoccus_NA_8,
+          Arenicellaceae_Arenicella_NA_6,
+          Arenicellaceae_Arenicella_NA_3,
+          Flavobacteriaceae_Algitalea_NA,
+        `Microtrichaceae_Sva0996 marine group_NA_7`) %>% 
+   mutate_if(is.numeric, round, digits = 5)
+
+rcorr_r2_sigASV <- rcorr_r2_ASV_Sugar %>% 
+  select(Pirellulaceae_Blastopirellula_NA_12 ,
+           Pirellulaceae_Blastopirellula_NA_7,
+           Granulosicoccaceae_Granulosicoccus_NA_11,
+           Pirellulaceae_Blastopirellula_NA_11,
+           Granulosicoccaceae_Granulosicoccus_NA_6,
+           Saprospiraceae_Portibacter_NA_5,
+           Thiotrichaceae_Leucothrix_NA_8,
+         `Microtrichaceae_Sva0996 marine group_NA_8`,
+          Trueperaceae_Truepera_NA_1,
+          `Microtrichaceae_Sva0996 marine group_NA_1`,
+          Cellvibrionaceae_NA_NA_6,
+          Flavobacteriaceae_Ulvibacter_NA_2,
+          Granulosicoccaceae_Granulosicoccus_NA_8,
+          Arenicellaceae_Arenicella_NA_6,
+          Arenicellaceae_Arenicella_NA_3,
+          Flavobacteriaceae_Algitalea_NA,
+        `Microtrichaceae_Sva0996 marine group_NA_7`) %>% 
+ mutate_if(is.numeric, round, digits = 2)
+
+combined_R2_p_value <- mapply(function(x, y){paste(x,y, sep = ",")},rcorr_r2_sigASV ,rcorr_p_sigASV )
+
+combined_R2_p_value <- as.data.frame(combined_R2_p_value)
+
+rownames(combined_R2_p_value) <- c(rownames(rcorr_P_ASV_Sugar))
+
+
+write_csv(combined_R2_p_value, "/Users/chanceenglish/Desktop/Lab Shiz/ARPA-e/Giant_Kelp_Microbiome/Outputdata/combined_R2_p_value.csv")
+
+
+
+```
+
+
+
+
+# Get Order of ASVs from Heatmap 
+
+```{r}
+
+sig_taxa_RA_df_majority_4sugars %>% 
+  select(Saprospiraceae_NA_NA_34,
+         Pirellulaceae_Rubripirellula_NA_3,
+         Pirellulaceae_Blastopirellula_NA_5,
+         Saprospiraceae_Portibacter_NA_5,
+         Granulosicoccaceae_Granulosicoccus_NA_10,
+         Saprospiraceae_NA_NA_22,
+         Granulosicoccaceae_Granulosicoccus_NA_14,
+         Pirellulaceae_Blastopirellula_NA_1,
+         Granulosicoccaceae_Granulosicoccus_NA_13,
+         Granulosicoccaceae_Granulosicoccus_NA_6,
+         Hyphomonadaceae_Litorimonas_NA_2,
+         `Microtrichaceae_Sva0996 marine group_NA_2`,
+         Thiotrichaceae_Cocleimonas_NA_7,
+         Pirellulaceae_Blastopirellula_NA_11,
+         Granulosicoccaceae_Granulosicoccus_NA_11,
+         Pirellulaceae_Blastopirellula_NA_7,
+         Pirellulaceae_Blastopirellula_NA_12,
+         Granulosicoccaceae_Granulosicoccus_NA_8,
+         Flavobacteriaceae_Ulvibacter_NA_2,
+         Cellvibrionaceae_NA_NA_6,
+         `Microtrichaceae_Sva0996 marine group_NA_1`,
+         Trueperaceae_Truepera_NA_1,
+         `Microtrichaceae_Sva0996 marine group_NA_8`,
+         Thiotrichaceae_Leucothrix_NA_8,
+         `Microtrichaceae_Sva0996 marine group_NA_7`,
+         Flavobacteriaceae_Algitalea_NA,
+         Arenicellaceae_Arenicella_NA_3,
+         Arenicellaceae_Arenicella_NA_6,
+         Arenicellaceae_Arenicella_NA_8,
+         Granulosicoccaceae_Granulosicoccus_NA_2,
+         Granulosicoccaceae_Granulosicoccus_NA_4,
+         Thiotrichaceae_Cocleimonas_NA_4,
+         Colwelliaceae_Thalassotalea_NA_2,
+         Rubinisphaeraceae_NA_NA_2,
+         `KI89A clade_NA_NA`,
+         Saprospiraceae_NA_NA_21,
+         Granulosicoccaceae_Granulosicoccus_NA_7,
+         Rubinisphaeraceae_NA_NA_3,
+         `Microtrichaceae_Sva0996 marine group_NA_6`,
+         `Microtrichaceae_Sva0996 marine group_NA_3`,
+         Saprospiraceae_NA_NA_32,
+         Pirellulaceae_Blastopirellula_NA_2,
+         Rubinisphaeraceae_NA_NA_1,
+         Hyphomonadaceae_Hellea_NA_1
+         )
+
+
+
+
+
+```
+
+# Barplot of ASVs w/ significant sugar correlations 
+
+```{r}
+
+sig_taxa_RA_df_majority_4sugars_samplenames <- sig_taxa_RA_df_majority_4sugars %>% 
+  rownames_to_column(var = "DNA_SampleID")
+
+
+sig_taxa_RA_df_majority_4sugars_long_wSampleName <- sig_taxa_RA_df_majority_4sugars_samplenames %>%
+  pivot_longer(
+    cols = Rubinisphaeraceae_NA_NA_1:Granulosicoccaceae_Granulosicoccus_NA_14,
+    names_to = "ASV",
+    values_to = "RA") %>% 
+  filter(ASV != "NA")
+
+sig_taxa_RA_df_majority_4sugars_long_wSampleName$ASV <- factor(sig_taxa_RA_df_majority_4sugars_long_wSampleName$ASV,
+                                                   levels = 
+                                                     c("Pirellulaceae_Blastopirellula_NA_12",
+           "Pirellulaceae_Blastopirellula_NA_7",
+           "Granulosicoccaceae_Granulosicoccus_NA_11",
+           "Pirellulaceae_Blastopirellula_NA_11",
+           "Granulosicoccaceae_Granulosicoccus_NA_6",
+           "Saprospiraceae_Portibacter_NA_5",
+           "Thiotrichaceae_Leucothrix_NA_8",
+           "Microtrichaceae_Sva0996 marine group_NA_8",
+          "Trueperaceae_Truepera_NA_1",
+          "Microtrichaceae_Sva0996 marine group_NA_1",
+          "Cellvibrionaceae_NA_NA_6",
+          "Flavobacteriaceae_Ulvibacter_NA_2",
+          "Granulosicoccaceae_Granulosicoccus_NA_8",
+          "Arenicellaceae_Arenicella_NA_6",
+          "Arenicellaceae_Arenicella_NA_3",
+          "Flavobacteriaceae_Algitalea_NA",
+          "Microtrichaceae_Sva0996 marine group_NA_7"))
+
+sig_taxa_RA_df_majority_4sugars_long_wSampleName <- sig_taxa_RA_df_majority_4sugars_long_wSampleName %>% 
+  filter(ASV != "NA")
+  
+sig_taxa_cumulativeRA_plot <- sig_taxa_RA_df_majority_4sugars_long_wSampleName %>% 
+  group_by(DNA_SampleID) %>% 
+  summarize(Sum_RA = sum(RA)*100) %>% 
+  ggplot(aes(x = DNA_SampleID, y = Sum_RA)) +
+  geom_col()+
+  labs(y = "Cumulative RA (%)",
+       x = "Sample")+
+  theme(panel.background = element_rect(fill = "white", color = "black", size = 1.5),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        plot.margin = margin(1,1,1,1, "cm"),
+        strip.background = element_rect(fill = "white", color = "black"),
+        legend.key = element_rect(fill = "white"),
+        legend.text = element_text(size = 20),
+        legend.key.height = unit(0.5, "inch"),
+        legend.key.width = unit(0.4, "inch"),
+        legend.title = element_text(size = 24),
+        axis.text.x = element_text(size = 10, angle = 90),
+        axis.text = element_text(size = 15, color = "black"),
+        axis.title = element_text(size = 20),
+        text = element_text(family = "Times")) 
+
+
+
+```
+
+
+# Estimate Diversity 
+
+
+
+```{r}
+
+
+count_table_richness <- count_table %>% 
+  filter(Family != "Mitochondria" & Order != "Chloroplast" & Kingdom != "Eukaryota") %>%
+  select(sequence, MP_230809_B1_S1: MP_240616_B6_S54) %>% 
+  filter(rowSums(across(where(is.numeric)))>0) %>% 
+  column_to_rownames(var = "sequence")
+  
+
+
+
+
+# Generate Phyloseq Object
+
+OTU = otu_table(count_table_richness, taxa_are_rows = TRUE)
+TAX = tax_table(taxa_table_diversity)
+
+
+ps = phyloseq(OTU)
+
+
+# Calcualte Richness Statistics 
+
+richness_df <- estimate_richness(ps, measures = c("Chao1", "Shannon")) %>%
+  rownames_to_column(., var = "DNA_SampleID")
+
+
+MP_biofilm_samples_richness <- merge(sampletable_df_nmds, richness_df, by = "DNA_SampleID")
+
+# Save richness and metadata merged file as a csv
+
+write_csv(MP_biofilm_samples_richness, "/Users/chanceenglish/Desktop/Lab Shiz/ARPA-e/Giant_Kelp_Microbiome/Outputdata/MP_biofilm_samples_richness.csv")
+
+# Load richness and metadata merged file as a csv 
+
+MP_biofilm_samples_richness <- read_csv("/Users/chanceenglish/Desktop/Lab Shiz/ARPA-e/Giant_Kelp_Microbiome/Outputdata/MP_biofilm_samples_richness.csv")
+
+# Polynomial regression Shannon Divewrsity vs. age 
+
+## Spring
+
+MP_biofilm_samples_richness_spring <- MP_biofilm_samples_richness %>% 
+  filter(season == "Spring")
+  
+
+spring_shannon_div_age_model <- lm(Shannon ~ poly(age_d, 2, raw = TRUE), 
+                data = MP_biofilm_samples_richness_spring)
+
+summary(spring_shannon_div_age_model)
+
+new_x_spring  <- seq(min(MP_biofilm_samples_richness_spring$age_d),
+                         max(MP_biofilm_samples_richness_spring$age_d), 1)
+prediction_spring <- exp(predict(spring_shannon_div_age_model, newdata = list(age_d = new_x_spring)))
+polyn_line_spring   <- data.frame(x = new_x_spring, y = prediction_spring)
+
+
+## Summer
+
+MP_biofilm_samples_richness_summer <- MP_biofilm_samples_richness %>% 
+  filter(season == "Summer")
+
+
+summer_shannon_div_age_model <- lm(Shannon ~ poly(age_d, 2, raw = TRUE), 
+                data = MP_biofilm_samples_richness_summer)
+
+
+summary(summer_shannon_div_age_model)
+
+summer_shannon_div_age_model_linear <- lm(Shannon ~ age_d, 
+                data = MP_biofilm_samples_richness_summer)
+
+summary(summer_shannon_div_age_model_linear)
+
+new_x_summer  <- seq(min(MP_biofilm_samples_richness_summer$age_d),
+                         max(MP_biofilm_samples_richness_summer$age_d), 1)
+prediction_summer <- exp(predict(summer_shannon_div_age_model, newdata = list(age_d = new_x_summer)))
+polyn_line_summer   <- data.frame(x = new_x_summer, y = prediction_summer)
+
+
+
+
+
+Shannon_div_plot <- MP_biofilm_samples_richness%>%
+  ggplot(aes(x = age_d, y = Shannon, shape = season)) +
+  geom_point(size = 5) +
+  labs(x = "Age (d)",
+       y = "Shannon Diversity",
+       shape = "") +
+   stat_smooth(method = "lm", formula = y ~ poly(x, 2), size = 2, se = FALSE, color = "black") +
+   theme(panel.background = element_rect(fill = "white", color = "black", size = 1.5),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        plot.margin = margin(1,1,1,1, "cm"),
+        strip.background = element_rect(fill = "white", color = "black"),
+        legend.position = c(0.75,0.25),
+        legend.key = element_rect(fill = "white"),
+        legend.text = element_text(size = 20),
+        legend.key.height = unit(0.5, "inch"),
+        legend.key.width = unit(0.4, "inch"),
+        legend.title = element_text(size = 24),
+        axis.text = element_text(size = 30, color = "black"),
+        axis.title = element_text(size = 25),
+        text = element_text(family = "Times")) 
+
+
+
+
+
+
+Chao1_div_plot <- MP_biofilm_samples_richness%>%
+  ggplot(aes(x = age_d, y = Chao1, color = season)) +
+  geom_point(size = 5) +
+  labs(x = "Age (d)",
+       y = "Chao1",
+       color = "") +
+   stat_smooth(aes(color = season), method = "lm", se = FALSE) +
+   scale_color_manual(values = c("red", "black")) +
+   theme(panel.background = element_rect(fill = "white", color = "black", size = 1.5),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        plot.margin = margin(1,1,1,1, "cm"),
+        strip.background = element_rect(fill = "white", color = "black"),
+        legend.key = element_rect(fill = "white"),
+        legend.text = element_text(size = 20),
+        legend.key.height = unit(0.5, "inch"),
+        legend.key.width = unit(0.4, "inch"),
+        legend.position = c(0.8, 0.25),
+        legend.title = element_text(size = 24),
+        axis.text = element_text(size = 30, color = "black"),
+        axis.title = element_text(size = 25),
+        text = element_text(family = "Times")) 
+
+
+
+
+
+```
+
+# Stats: Diversity Metrics over time 
+
+```{r}
+
+library(rstatix)
+
+# Repeated measures ANOVA of Shannon Diversity  by seaso  
+
+Shannon_df <- MP_biofilm_samples_richness %>% 
+  mutate(phase = case_when(
+    age_d >= 50 ~ "Senescent",
+    age_d < 50 ~ "Mature"
+  )) %>% 
+  select(season, phase, Shannon) 
+
+#
+
+Shannon_df_senescent <- Shannon_df %>% 
+  filter(phase == "Senescent")
+
+# Difference in diversity in senescent phase kelp. Kruskall walls test as data is not normally distributed 
+
+wilcox.test(Shannon_df_senescent$Shannon[Shannon_df_senescent$season == "Summer"],
+            Shannon_df_senescent$Shannon[Shannon_df_senescent$season == "Spring"], 
+            alternative = "two.sided")
+
+# No significant difference 
+
+# Difference in diversity in senescent phase kelp. Kruskall walls test as data is normally distributed 
+
+Shannon_df_mature <- Shannon_df %>% 
+  filter(phase == "Mature")
+
+t.test(Shannon_df_mature$Shannon[Shannon_df_mature$season == "Summer"],
+            Shannon_df_mature$Shannon[Shannon_df_mature$season == "Spring"], 
+            alternative = "two.sided") # 
+
+```
+

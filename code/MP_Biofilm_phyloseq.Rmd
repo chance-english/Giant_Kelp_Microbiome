@@ -1,0 +1,87 @@
+---
+title: "MP_Biofilm_Phyloseq"
+author: "Chance English"
+date: "9/14/2024"
+output: html_document
+---
+
+```{r setup, include=FALSE, messages = FALSE, echo = FALSE}
+knitr::opts_chunk$set(echo = TRUE, messages = FALSE, echo = FALSE)
+```
+
+
+# Load Packages
+
+
+```{r}
+
+library(phyloseq)
+library(ggplot2)
+library(dplyr)
+library(RColorBrewer)
+library(tidyverse)
+library(here)
+library(ggpubr)
+library(DESeq2)
+```
+
+
+# Load Sample Data 
+
+```{r}
+
+
+MP_Biofilm_Sample_Data <- read_csv(here("Inputdata/sampledata", "MP_Biofilm_Samples_Metadata.csv"))
+
+
+saveRDS(MP_Biofilm_Sample_Data, file = "/Users/chanceenglish/Desktop/Lab Shiz/ARPA-e/Giant_Kelp_Microbiome/Outputdata/sample.data.rds")
+
+
+```
+
+
+Count and Taxa
+
+```{r}
+
+count.table <- readRDS("/Users/chanceenglish/Desktop/Lab Shiz/ARPA-e/Giant_Kelp_Microbiome/Outputdata/seqtable_nochim.rds")
+
+taxa.table <- readRDS("/Users/chanceenglish/Desktop/Lab Shiz/ARPA-e/Giant_Kelp_Microbiome/Outputdata/taxa.rds")
+
+sample.table <- readRDS("/Users/chanceenglish/Desktop/Lab Shiz/ARPA-e/Giant_Kelp_Microbiome/Outputdata/sample.data.rds") %>% 
+  drop_na(DNA_SampleID) %>% 
+  column_to_rownames(var = "DNA_SampleID")
+```
+
+
+
+#Create Phyloseq Object
+
+Create phyloseq object that merges all 3 data files. 
+
+```{r}
+
+OTU = otu_table(count.table, taxa_are_rows = TRUE)
+TAX = tax_table(taxa.table)
+SAM = sample_data(sample.table)
+
+ps = phyloseq(OTU, TAX, SAM)
+
+
+
+```
+
+
+# Filter Sequences
+
+We will filter out chloroplasts and mitochondria 
+
+
+```{r}
+
+sub_ps <- ps %>% 
+  subset_taxa(Family != "Mitochondria", Class != "Chloroplast")
+
+
+
+```
